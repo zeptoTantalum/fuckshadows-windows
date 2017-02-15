@@ -125,7 +125,8 @@ namespace Shadowsocks.Controller
 
         // Size of receive buffer.
         public static readonly int RecvSize = 8192;
-        public static readonly int RecvReserveSize = IVEncryptor.ONETIMEAUTH_BYTES + IVEncryptor.AUTH_BYTES; // reserve for one-time auth
+        // TODO: calculate reserved bytes for AEADs
+        public static readonly int RecvReserveSize = 123; // reserve for one-time auth
         public static readonly int BufferSize = RecvSize + RecvReserveSize + 32;
 
         public DateTime lastActivity;
@@ -191,7 +192,7 @@ namespace Shadowsocks.Controller
             {
                 lock (_decryptionLock)
                 {
-                    _encryptor = EncryptorFactory.GetEncryptor(server.method, server.password, server.auth, false);
+                    _encryptor = EncryptorFactory.GetEncryptor(server.method, server.password, false);
                 }
             }
             this._server = server;

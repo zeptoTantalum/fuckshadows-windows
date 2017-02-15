@@ -4,8 +4,8 @@ using System.Runtime.InteropServices;
 
 namespace Shadowsocks.Encryption
 {
-    public class MbedTLSEncryptor
-        : IVEncryptor, IDisposable
+    public class StreamMbedTLSEncryptor
+        : StreamEncryptor, IDisposable
     {
         const int CIPHER_RC4 = 1;
         const int CIPHER_AES = 2;
@@ -15,8 +15,8 @@ namespace Shadowsocks.Encryption
         private IntPtr _encryptCtx = IntPtr.Zero;
         private IntPtr _decryptCtx = IntPtr.Zero;
 
-        public MbedTLSEncryptor(string method, string password, bool onetimeauth, bool isudp)
-            : base(method, password, onetimeauth, isudp)
+        public StreamMbedTLSEncryptor(string method, string password, bool isudp)
+            : base(method, password, isudp)
         {
         }
 
@@ -117,7 +117,7 @@ namespace Shadowsocks.Encryption
             GC.SuppressFinalize(this);
         }
 
-        ~MbedTLSEncryptor()
+        ~StreamMbedTLSEncryptor()
         {
             Dispose(false);
         }

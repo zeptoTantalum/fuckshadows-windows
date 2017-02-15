@@ -70,7 +70,7 @@ namespace test
         {
             RNG.Reload();
             byte[] plain = new byte[16384];
-            byte[] cipher = new byte[plain.Length + 16 + IVEncryptor.ONETIMEAUTH_BYTES + IVEncryptor.AUTH_BYTES];
+            byte[] cipher = new byte[plain.Length + 16];
             byte[] plain2 = new byte[plain.Length + 16];
             int outLen = 0;
             int outLen2 = 0;
@@ -130,8 +130,8 @@ namespace test
                 {
                     IEncryptor encryptor;
                     IEncryptor decryptor;
-                    encryptor = new MbedTLSEncryptor("aes-256-cfb", "barfoo!", false, false);
-                    decryptor = new MbedTLSEncryptor("aes-256-cfb", "barfoo!", false, false);
+                    encryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!", false);
+                    decryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!", false);
                     RunEncryptionRound(encryptor, decryptor);
                 }
             }
@@ -171,8 +171,8 @@ namespace test
                     var random = new Random();
                     IEncryptor encryptor;
                     IEncryptor decryptor;
-                    encryptor = new MbedTLSEncryptor("rc4-md5", "barfoo!", false, false);
-                    decryptor = new MbedTLSEncryptor("rc4-md5", "barfoo!", false, false);
+                    encryptor = new StreamMbedTLSEncryptor("rc4-md5", "barfoo!", false);
+                    decryptor = new StreamMbedTLSEncryptor("rc4-md5", "barfoo!", false);
                     RunEncryptionRound(encryptor, decryptor);
                 }
             }
@@ -212,8 +212,8 @@ namespace test
                     var random = new Random();
                     IEncryptor encryptor;
                     IEncryptor decryptor;
-                    encryptor = new SodiumEncryptor("salsa20", "barfoo!", false, false);
-                    decryptor = new SodiumEncryptor("salsa20", "barfoo!", false, false);
+                    encryptor = new StreamSodiumEncryptor("salsa20", "barfoo!", false);
+                    decryptor = new StreamSodiumEncryptor("salsa20", "barfoo!", false);
                     RunEncryptionRound(encryptor, decryptor);
                 }
             }
