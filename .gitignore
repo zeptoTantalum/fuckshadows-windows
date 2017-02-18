@@ -2,14 +2,13 @@
 Backup/
 bin/
 obj/
-shadowsocks-csharp/shadowsocks-csharp.csproj.user
+fuckshadows-csharp/fuckshadows-csharp.csproj.user
 TestResults
 *.suo
 
-shadowsocks-csharp/3rd/*
-!shadowsocks-csharp/3rd/zxing/
-!shadowsocks-csharp/3rd/SimpleJson.cs
+fuckshadows-csharp/3rd/*
+!fuckshadows-csharp/3rd/zxing/
 packages/*
 
-shadowsocks-csharp.sln.DotSettings.user
+fuckshadows-csharp.sln.DotSettings.user
 *.sln.DotSettings.user
