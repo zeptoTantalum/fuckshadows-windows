@@ -6,11 +6,15 @@
         public int IvSize;
         public int SaltSize;
         public int TagSize;
+        public int NonceSize;
         public int Type;
         public string InnerLibName;
 
         // For those who make use of internal crypto method name
         // e.g. mbed TLS
+
+        #region Stream ciphers
+
         public EncryptorInfo(string innerLibName, int keySize, int ivSize, int type)
         {
             this.KeySize = keySize;
@@ -27,23 +31,31 @@
             this.InnerLibName = string.Empty;
         }
 
-        public EncryptorInfo(string innerLibName, int keySize, int saltSize, int tagSize, int type)
+        #endregion
+
+        #region AEAD ciphers
+
+        public EncryptorInfo(string innerLibName, int keySize, int saltSize, int nonceSize, int tagSize, int type)
         {
             this.KeySize = keySize;
             this.SaltSize = saltSize;
+            this.NonceSize = nonceSize;
             this.TagSize = tagSize;
             this.Type = type;
             this.InnerLibName = innerLibName;
         }
 
-        public EncryptorInfo(int keySize, int saltSize, int tagSize, int type)
+        public EncryptorInfo(int keySize, int saltSize, int nonceSize, int tagSize, int type)
         {
             this.KeySize = keySize;
             this.SaltSize = saltSize;
+            this.NonceSize = nonceSize;
             this.TagSize = tagSize;
             this.Type = type;
             this.InnerLibName = string.Empty;
         }
+
+        #endregion
     }
 
     public abstract class EncryptorBase

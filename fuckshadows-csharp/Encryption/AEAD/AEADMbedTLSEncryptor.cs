@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 
 namespace Fuckshadows.Encryption.AEAD
 {
-    public class AEADMbedTLSEncryptor:AEADEncryptor,IDisposable
+    public class AEADMbedTLSEncryptor
+        : AEADEncryptor, IDisposable
     {
         const int CIPHER_AES = 1;
 
@@ -19,10 +20,11 @@ namespace Fuckshadows.Encryption.AEAD
         {
         }
 
-        private static Dictionary<string, EncryptorInfo> _ciphers = new Dictionary<string, EncryptorInfo> {
-            { "aes-128-gcm", new EncryptorInfo("AES-128-GCM", 16, 16, 16, CIPHER_AES) },
-            { "aes-192-gcm", new EncryptorInfo("AES-192-GCM", 24, 16, 16, CIPHER_AES) },
-            { "aes-256-gcm", new EncryptorInfo("AES-256-GCM", 32, 16, 16, CIPHER_AES) },
+        private static Dictionary<string, EncryptorInfo> _ciphers = new Dictionary<string, EncryptorInfo>
+        {
+            {"aes-128-gcm", new EncryptorInfo("AES-128-GCM", 16, 16, 12, 16, CIPHER_AES)},
+            {"aes-192-gcm", new EncryptorInfo("AES-192-GCM", 24, 24, 12, 16, CIPHER_AES)},
+            {"aes-256-gcm", new EncryptorInfo("AES-256-GCM", 32, 32, 12, 16, CIPHER_AES)},
         };
 
         public static List<string> SupportedCiphers()

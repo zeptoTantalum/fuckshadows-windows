@@ -66,6 +66,10 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Cyotek.Collections.Generic.CircularBuffer, Version=1.0.0.0, Culture=neutral, PublicKeyToken=58daa28b0b2de221, processorArchitecture=MSIL">
+      <HintPath>3rd\Cyotek.CircularBuffer.1.0.2\lib\net20\Cyotek.Collections.Generic.CircularBuffer.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="GlobalHotKey, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>3rd\GlobalHotKey.1.1.0\lib\GlobalHotKey.dll</HintPath>
       <Private>True</Private>
@@ -143,6 +147,7 @@
     <Compile Include="Controller\System\Hotkeys\HotkeyCallbacks.cs" />
     <Compile Include="Encryption\AEAD\AEADEncryptor.cs" />
     <Compile Include="Encryption\AEAD\AEADMbedTLSEncryptor.cs" />
+    <Compile Include="Encryption\AEAD\AEADSodiumEncryptor.cs" />
     <Compile Include="Encryption\Exception\CryptoException.cs" />
     <Compile Include="Model\HotKeyConfig.cs" />
     <Compile Include="Model\ProxyConfig.cs" />

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Net;
+using Cyotek.Collections.Generic;
 using Fuckshadows.Encryption.Exception;
 
 namespace Fuckshadows.Encryption.Stream
@@ -11,6 +12,9 @@ namespace Fuckshadows.Encryption.Stream
         : EncryptorBase
     {
         protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
+
+        // every connection should create its own buffer
+        protected CircularBuffer<byte> CircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 4, false);
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
@@ -60,12 +64,12 @@ namespace Fuckshadows.Encryption.Stream
             {
                 byte[] passbuf = Encoding.UTF8.GetBytes(password);
                 byte[] key = new byte[keyLen];
-                bytesToKey(passbuf, key);
+                LegacyDeriveKey(passbuf, key);
                 return key;
             });
         }
 
-        protected void bytesToKey(byte[] password, byte[] key)
+        protected void LegacyDeriveKey(byte[] password, byte[] key)
         {
             byte[] result = new byte[password.Length + 16];
             int i = 0;

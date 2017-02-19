@@ -12,8 +12,10 @@ namespace Fuckshadows.Encryption.AEAD
     public abstract class AEADEncryptor
         : EncryptorBase
     {
-        private const string personal = "fuckshadows-g3nk";
-        private static byte[] personalBytes = Encoding.ASCII.GetBytes(personal);
+        // We are using the same saltLen and keyLen
+
+        private const string Personal = "fuckshadows-g3nk";
+        private static readonly byte[] PersonalBytes = Encoding.ASCII.GetBytes(Personal);
 
         private const int CHUNK_LEN_BYTES = 2;
 
@@ -23,13 +25,6 @@ namespace Fuckshadows.Encryption.AEAD
 
         private static readonly ConcurrentDictionary<string, byte[]> CachedKeys =
             new ConcurrentDictionary<string, byte[]>();
-
-        protected byte[] _encryptSalt;
-        protected byte[] _decryptSalt;
-
-        // Is first packet
-        protected bool _decryptSaltReceived;
-        protected bool _encryptSaltSent;
 
         protected string _method;
         protected int _cipher;
@@ -41,11 +36,25 @@ namespace Fuckshadows.Encryption.AEAD
         protected int keyLen;
         protected int saltLen;
         protected int tagLen;
+        protected int nonceLen;
+
+        protected byte[] _encryptSalt;
+        protected byte[] _decryptSalt;
+
+
+        protected byte[] _nonce;
+        // Is first packet
+        protected bool _decryptSaltReceived;
+        protected bool _encryptSaltSent;
+
+
 
         public AEADEncryptor(string method, string password)
             : base(method, password)
         {
             InitKey(method, password);
+            // Initialize all-zero nonce for each connection
+            _nonce = new byte[nonceLen];
         }
 
         protected abstract Dictionary<string, EncryptorInfo> getCiphers();
@@ -66,6 +75,7 @@ namespace Fuckshadows.Encryption.AEAD
             keyLen = CipherInfo.KeySize;
             saltLen = CipherInfo.SaltSize;
             tagLen = CipherInfo.TagSize;
+            nonceLen = CipherInfo.NonceSize;
             _Masterkey = CachedKeys.GetOrAdd(k, (nk) =>
             {
                 byte[] passbuf = Encoding.UTF8.GetBytes(password);
@@ -75,17 +85,22 @@ namespace Fuckshadows.Encryption.AEAD
             });
         }
 
-        private void DeriveKey(byte[] password, byte[] key)
+        protected void DeriveKey(byte[] password, byte[] key)
         {
             int ret = Sodium.crypto_generichash(key, keyLen, password, (ulong) password.Length, IntPtr.Zero, 0);
             if (ret != 0) throw new System.Exception("failed to generate hash");
         }
 
-        private void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
+        protected void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
         {
             int ret = Sodium.crypto_generichash_blake2b_salt_personal(sessionKey, keyLen, IntPtr.Zero, 0, masterKey,
-                keyLen, salt, personalBytes);
+                keyLen, salt, PersonalBytes);
             if (ret != 0) throw new System.Exception("failed to generate session key");
+        }
+
+        protected void IncrementNonce()
+        {
+            Sodium.sodium_increment(_nonce, nonceLen);
         }
 
         protected virtual void initCipher(byte[] salt, bool isCipher)
@@ -102,13 +117,19 @@ namespace Fuckshadows.Encryption.AEAD
             }
         }
 
-        protected abstract void cipherEncrypt(bool isUdp, int length, byte[] buf, byte[] outbuf);
-        protected abstract void cipherDecrypt(bool isUdp, int length, byte[] buf, byte[] ourbuf);
-
         protected static void randBytes(byte[] buf, int length)
         {
             RNG.GetBytes(buf, length);
         }
+
+        #region Cipher specific implementations
+
+        protected abstract void cipherEncrypt(bool isUdp, int length, byte[] buf, byte[] outbuf);
+        protected abstract void cipherDecrypt(bool isUdp, int length, byte[] buf, byte[] ourbuf);
+
+        #endregion
+
+        #region API for other module
 
         public override void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
@@ -171,5 +192,30 @@ namespace Fuckshadows.Encryption.AEAD
         {
             throw new NotImplementedException();
         }
+
+        #endregion
+
+        #region Private handling
+
+        private void ChunkEncrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
+        {
+            throw new NotImplementedException();
+        }
+
+        /// <summary>
+        /// decrypt chunk
+        /// </summary>
+        /// <param name="buf"></param>
+        /// <param name="length"></param>
+        /// <param name="outbuf"></param>
+        /// <param name="outlength"></param>
+        /// <returns>number of Chunk that successfully decrypted</returns>
+        private int ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
+
     }
 }
