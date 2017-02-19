@@ -13,18 +13,6 @@ using Fuckshadows.Util;
 
 namespace Fuckshadows.View
 {
-    public class TrafficInfo
-    {
-        public long inbound;
-        public long outbound;
-
-        public TrafficInfo(long inbound, long outbound)
-        {
-            this.inbound = inbound;
-            this.outbound = outbound;
-        }
-    }
-
     public partial class LogForm : Form
     {
         long lastOffset;
