@@ -85,13 +85,13 @@ namespace Fuckshadows.Encryption.AEAD
             });
         }
 
-        protected void DeriveKey(byte[] password, byte[] key)
+        public void DeriveKey(byte[] password, byte[] key)
         {
             int ret = Sodium.crypto_generichash(key, keyLen, password, (ulong) password.Length, IntPtr.Zero, 0);
             if (ret != 0) throw new System.Exception("failed to generate hash");
         }
 
-        protected void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
+        public void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
         {
             int ret = Sodium.crypto_generichash_blake2b_salt_personal(sessionKey, keyLen, IntPtr.Zero, 0, masterKey,
                 keyLen, salt, PersonalBytes);

@@ -69,7 +69,7 @@ namespace Fuckshadows.Encryption.Stream
             });
         }
 
-        protected void LegacyDeriveKey(byte[] password, byte[] key)
+        public static void LegacyDeriveKey(byte[] password, byte[] key)
         {
             byte[] result = new byte[password.Length + 16];
             int i = 0;

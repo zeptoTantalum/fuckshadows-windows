@@ -6,7 +6,9 @@ using GlobalHotKey;
 using System.Windows.Input;
 using System.Threading;
 using System.Collections.Generic;
+using System.Text;
 using Fuckshadows.Controller.Hotkeys;
+using Fuckshadows.Encryption.AEAD;
 using NUnit.Framework;
 
 namespace test
@@ -231,6 +233,50 @@ namespace test
                 encryptionFailed = true;
                 throw;
             }
+        }
+
+        [TestCase]
+        public void TestLegacyDeriveKey() {
+            string pass = "test-legacy";
+            byte[] passBytes = Encoding.UTF8.GetBytes(pass);
+            byte[] key1 = new byte[32];
+            StreamEncryptor.LegacyDeriveKey(passBytes, key1);
+            // TODO: add reference key output
+            byte[] key2 = new[] { (byte)0x10};
+            string key1str = Convert.ToBase64String(key1);
+            string key2str = Convert.ToBase64String(key2);
+            Assert.IsTrue(key1str == key2str);
+        }
+
+        [TestCase]
+        public void TestDeriveKey()
+        {
+            string pass = "test-aead-derive-key";
+            byte[] passBytes = Encoding.UTF8.GetBytes(pass);
+            byte[] key1 = new byte[32];
+            AEADSodiumEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", pass);
+            encryptor.DeriveKey(passBytes, key1);
+            // TODO: add reference key output
+            byte[] key2 = new[] { (byte)0x10 };
+            string key1str = Convert.ToBase64String(key1);
+            string key2str = Convert.ToBase64String(key2);
+            Assert.IsTrue(key1str == key2str);
+        }
+
+        [TestCase]
+        public void TestDeriveSessionKey() {
+            string pass = "test-aead-derive-session-key";
+            byte[] passBytes = Encoding.UTF8.GetBytes(pass);
+            byte[] skey1 = new byte[32];
+            // TODO: set salt, master key and session key
+            byte[] saltBytes = new[] { (byte) 0x01 };
+            byte[] masterKeyBytes = new[] { (byte) 0x01 };
+            byte[] skey2 = new[] { (byte) 0x01 };
+            AEADSodiumEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", pass);
+            encryptor.DeriveSessionKey(saltBytes, masterKeyBytes, skey1);
+            string skey1str = Convert.ToBase64String(skey1);
+            string skey2str = Convert.ToBase64String(skey2);
+            Assert.IsTrue(skey1str == skey2str);
         }
     }
 }
