@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using Fuckshadows.Encryption.Exception;
 
 namespace Fuckshadows.Encryption.AEAD
 {
@@ -37,14 +38,58 @@ namespace Fuckshadows.Encryption.AEAD
             return _ciphers;
         }
 
-        protected override void cipherEncrypt(bool isCipher, int length, byte[] buf, byte[] outbuf)
+        protected override int cipherEncrypt(byte[] key, byte[] buf, int length, byte[] outbuf, ref int outlength)
         {
-            throw new NotImplementedException();
+            // buf: all plaintext
+            // outbuf: ciphertext + tag
+            int ret;
+            byte[] tagbuf = new byte[tagLen];
+            switch (_cipher) {
+                case CIPHER_AES:
+                    ret = MbedTLS.cipher_setkey(_encryptCtx, key, keyLen * 8, MbedTLS.MBEDTLS_ENCRYPT);
+                    if (ret != 0) throw new System.Exception("failed to set key");
+                    ret = MbedTLS.cipher_auth_encrypt(_encryptCtx,
+                        _nonce, nonceLen,
+                        IntPtr.Zero, 0,
+                        buf, length,
+                        outbuf, ref length,
+                        tagbuf, tagLen);
+                    if(ret!=0) throw new CryptoErrorException();
+
+                    Buffer.BlockCopy(tagbuf, 0, outbuf, length, tagLen);
+                    outlength = length + tagLen;
+                    return ret;
+                default:
+                    throw new System.Exception("not implemented");
+            }
         }
 
-        protected override void cipherDecrypt(bool isCipher, int length, byte[] buf, byte[] ourbuf)
+        protected override int cipherDecrypt(byte[] key, byte[] buf, int length, byte[] outbuf, ref int outlength)
         {
-            throw new NotImplementedException();
+            // buf: ciphertext + tag
+            // outbuf: plaintext
+            int ret;
+            // split tag
+            byte[] tagbuf = new byte[tagLen];
+            Buffer.BlockCopy(buf, length, tagbuf, 0, tagLen);
+            switch (_cipher) {
+                case CIPHER_AES:
+                    ret = MbedTLS.cipher_setkey(_decryptCtx, key, keyLen * 8, MbedTLS.MBEDTLS_DECRYPT);
+                    if (ret!=0) throw new System.Exception("failed to set key");
+
+                    ret = MbedTLS.cipher_auth_decrypt(_decryptCtx,
+                                                          _nonce, nonceLen,
+                                                          IntPtr.Zero, 0,
+                                                          buf, length,
+                                                          outbuf, ref outlength,
+                                                          tagbuf, tagLen);
+                    if(ret!=0) throw new CryptoErrorException();
+
+                    outlength = length - tagLen;
+                    return ret;
+                default:
+                    throw new System.Exception("not implemented");
+            }
         }
 
         #region IDisposable

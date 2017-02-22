@@ -47,7 +47,34 @@ namespace Fuckshadows.Encryption.AEAD
         protected bool _decryptSaltReceived;
         protected bool _encryptSaltSent;
 
+        #region unprocessed data buffer for each connection
 
+        private class unprocessedBuf
+        {
+            private const int BufLen = 16*1024;
+            private byte[] buf = new byte[BufLen];
+            public int unprocessedBufLen { get; private set; } = 0;
+            public bool isDirty { get; private set; } = false;
+
+            public void Add(byte[] src, int srcIdx, int Len)
+            {
+                if (isDirty) throw new System.Exception("already have data");
+                if (Len > BufLen) throw new System.Exception("too long");
+                Buffer.BlockCopy(src, srcIdx, buf, 0, Len );
+                unprocessedBufLen = Len;
+                isDirty = true;
+            }
+
+            public void Take(byte[] dst, int dstIdx, int Len)
+            {
+                if (!isDirty) throw new System.Exception("no data to take");
+                Buffer.BlockCopy(buf, 0, dst, dstIdx, Len);
+                unprocessedBufLen -= Len;
+                isDirty = unprocessedBufLen > 0;
+            }
+        }
+
+        #endregion
 
         public AEADEncryptor(string method, string password)
             : base(method, password)
@@ -122,10 +149,30 @@ namespace Fuckshadows.Encryption.AEAD
             RNG.GetBytes(buf, length);
         }
 
-        #region Cipher specific implementations
+        #region Cipher-specific implementations
 
-        protected abstract void cipherEncrypt(bool isUdp, int length, byte[] buf, byte[] outbuf);
-        protected abstract void cipherDecrypt(bool isUdp, int length, byte[] buf, byte[] ourbuf);
+        /// <summary>
+        /// Encrypt wrapper
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="buf">plaintext</param>
+        /// <param name="length">plen</param>
+        /// <param name="outbuf">ciphertext + tag</param>
+        /// <param name="outlength">plen + tlen</param>
+        /// <returns></returns>
+        protected abstract int cipherEncrypt(byte[] key, byte[] buf, int length, byte[] outbuf, ref int outlength);
+
+        /// <summary>
+        /// Decrypt wrapper
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="buf">ciphertext + tag</param>
+        /// <param name="length">clen + tlen</param>
+        /// <param name="outbuf">plaintext</param>
+        /// <param name="outlength">plen</param>
+        /// <returns></returns>
+        protected abstract int cipherDecrypt(byte[] key, byte[] buf, int length, byte[] outbuf, ref int outlength);
+
 
         #endregion
 
@@ -141,7 +188,7 @@ namespace Fuckshadows.Encryption.AEAD
                 _encryptSaltSent = true;
                 lock (tempbuf)
                 {
-                    cipherEncrypt(false, length, buf, tempbuf);
+                    //cipherEncrypt(false, length, buf, tempbuf);
                     outlength = length + tagLen * 2 + saltLen + CHUNK_LEN_BYTES;
                     Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
                 }
@@ -149,7 +196,7 @@ namespace Fuckshadows.Encryption.AEAD
             else
             {
                 outlength = length + tagLen * 2 + CHUNK_LEN_BYTES;
-                cipherEncrypt(false, length, buf, outbuf);
+                //cipherEncrypt(false, length, buf, outbuf);
             }
         }
 
@@ -161,7 +208,7 @@ namespace Fuckshadows.Encryption.AEAD
             _encryptSaltSent = true;
             lock (tempbuf)
             {
-                cipherEncrypt(true, length, buf, tempbuf);
+                //cipherEncrypt(true, length, buf, tempbuf);
                 outlength = length + tagLen + saltLen;
                 Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
             }
@@ -199,18 +246,12 @@ namespace Fuckshadows.Encryption.AEAD
 
         private void ChunkEncrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
+            int err;
+            int clen;
             throw new NotImplementedException();
         }
 
-        /// <summary>
-        /// decrypt chunk
-        /// </summary>
-        /// <param name="buf"></param>
-        /// <param name="length"></param>
-        /// <param name="outbuf"></param>
-        /// <param name="outlength"></param>
-        /// <returns>number of Chunk that successfully decrypted</returns>
-        private int ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
+        private void ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
             throw new NotImplementedException();
         }
