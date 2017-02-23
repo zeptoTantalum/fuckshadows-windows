@@ -63,6 +63,7 @@ namespace Fuckshadows.Encryption.Stream
         {
             byte[] passbuf = Encoding.UTF8.GetBytes(password);
             if (_key == null) _key = new byte[keyLen];
+            if (_key.Length < keyLen) Array.Resize(ref _key, keyLen);
             LegacyDeriveKey(passbuf, _key);
         }
 

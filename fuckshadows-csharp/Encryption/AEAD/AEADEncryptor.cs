@@ -105,6 +105,7 @@ namespace Fuckshadows.Encryption.AEAD
         {
             byte[] passbuf = Encoding.UTF8.GetBytes(password);
             if (_Masterkey == null) _Masterkey = new byte[keyLen];
+            if (_Masterkey.Length < keyLen) Array.Resize(ref _Masterkey, keyLen);
             DeriveKey(passbuf, _Masterkey);
 
         }
