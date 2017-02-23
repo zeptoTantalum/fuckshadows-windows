@@ -18,9 +18,6 @@ namespace Fuckshadows.Encryption.Stream
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
-        private static readonly ConcurrentDictionary<string, byte[]> CachedKeys =
-            new ConcurrentDictionary<string, byte[]>();
-
         protected byte[] _encryptIV;
         protected byte[] _decryptIV;
 
@@ -33,40 +30,40 @@ namespace Fuckshadows.Encryption.Stream
         // internal name in the crypto library
         protected string _innerLibName;
         protected EncryptorInfo CipherInfo;
-        protected byte[] _key;
+        // long-time master key
+        protected static byte[] _key = null;
         protected int keyLen;
         protected int ivLen;
 
         public StreamEncryptor(string method, string password)
             : base(method, password)
         {
-            InitKey(method, password);
+            InitEncryptorInfo(method);
+            InitKey(password);
         }
 
         protected abstract Dictionary<string, EncryptorInfo> getCiphers();
 
-        private void InitKey(string method, string password)
+        private void InitEncryptorInfo(string method)
         {
             method = method.ToLower();
             _method = method;
-            string k = method + ":" + password;
             ciphers = getCiphers();
             CipherInfo = ciphers[_method];
             _innerLibName = CipherInfo.InnerLibName;
             _cipher = CipherInfo.Type;
-            if (_cipher == 0)
-            {
+            if (_cipher == 0) {
                 throw new System.Exception("method not found");
             }
             keyLen = CipherInfo.KeySize;
             ivLen = CipherInfo.IvSize;
-            _key = CachedKeys.GetOrAdd(k, (nk) =>
-            {
-                byte[] passbuf = Encoding.UTF8.GetBytes(password);
-                byte[] key = new byte[keyLen];
-                LegacyDeriveKey(passbuf, key);
-                return key;
-            });
+        }
+
+        private void InitKey(string password)
+        {
+            byte[] passbuf = Encoding.UTF8.GetBytes(password);
+            if (_key == null) _key = new byte[keyLen];
+            LegacyDeriveKey(passbuf, _key);
         }
 
         public static void LegacyDeriveKey(byte[] password, byte[] key)
