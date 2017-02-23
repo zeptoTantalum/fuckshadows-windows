@@ -45,7 +45,7 @@ namespace Fuckshadows.Encryption
         public static extern void md5(byte[] input, uint ilen, byte[] output);
 
         /// <summary>
-        /// Get cipher ctx size for memory allocation
+        /// Get cipher ctx size for unmanaged memory allocation
         /// </summary>
         /// <returns></returns>
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]

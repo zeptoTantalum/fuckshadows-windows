@@ -23,15 +23,12 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
-        private static readonly ConcurrentDictionary<string, byte[]> CachedKeys =
-            new ConcurrentDictionary<string, byte[]>();
-
         protected string _method;
         protected int _cipher;
         // internal name in the crypto library
         protected string _innerLibName;
         protected EncryptorInfo CipherInfo;
-        protected byte[] _Masterkey;
+        protected static byte[] _Masterkey = null;
         protected byte[] _sessionKey;
         protected int keyLen;
         protected int saltLen;
@@ -51,7 +48,7 @@ namespace Fuckshadows.Encryption.AEAD
 
         private class unprocessedBuf
         {
-            private const int BufLen = 16*1024;
+            private const int BufLen = 16 * 1024;
             private byte[] buf = new byte[BufLen];
             public int unprocessedBufLen { get; private set; } = 0;
             public bool isDirty { get; private set; } = false;
@@ -60,14 +57,14 @@ namespace Fuckshadows.Encryption.AEAD
             {
                 if (isDirty) throw new System.Exception("already have data");
                 if (Len > BufLen) throw new System.Exception("too long");
-                Buffer.BlockCopy(src, srcIdx, buf, 0, Len );
+                Buffer.BlockCopy(src, srcIdx, buf, 0, Len);
                 unprocessedBufLen = Len;
                 isDirty = true;
             }
 
             public void Take(byte[] dst, int dstIdx, int Len)
             {
-                if (!isDirty) throw new System.Exception("no data to take");
+                if (! isDirty) throw new System.Exception("no data to take");
                 Buffer.BlockCopy(buf, 0, dst, dstIdx, Len);
                 unprocessedBufLen -= Len;
                 isDirty = unprocessedBufLen > 0;
@@ -79,37 +76,37 @@ namespace Fuckshadows.Encryption.AEAD
         public AEADEncryptor(string method, string password)
             : base(method, password)
         {
-            InitKey(method, password);
+            InitEncryptorInfo(method);
+            InitKey(password);
             // Initialize all-zero nonce for each connection
             _nonce = new byte[nonceLen];
         }
 
         protected abstract Dictionary<string, EncryptorInfo> getCiphers();
 
-        private void InitKey(string method, string password)
+        private void InitEncryptorInfo(string method)
         {
             method = method.ToLower();
             _method = method;
-            string k = $"{method}:{password}";
             ciphers = getCiphers();
             CipherInfo = ciphers[_method];
             _innerLibName = CipherInfo.InnerLibName;
             _cipher = CipherInfo.Type;
-            if (_cipher == 0)
-            {
+            if (_cipher == 0) {
                 throw new System.Exception("method not found");
             }
             keyLen = CipherInfo.KeySize;
             saltLen = CipherInfo.SaltSize;
             tagLen = CipherInfo.TagSize;
             nonceLen = CipherInfo.NonceSize;
-            _Masterkey = CachedKeys.GetOrAdd(k, (nk) =>
-            {
-                byte[] passbuf = Encoding.UTF8.GetBytes(password);
-                byte[] key = new byte[keyLen];
-                DeriveKey(passbuf, key);
-                return key;
-            });
+        }
+
+        private void InitKey(string password)
+        {
+            byte[] passbuf = Encoding.UTF8.GetBytes(password);
+            if (_Masterkey == null) _Masterkey = new byte[keyLen];
+            DeriveKey(passbuf, _Masterkey);
+
         }
 
         public void DeriveKey(byte[] password, byte[] key)
@@ -121,58 +118,30 @@ namespace Fuckshadows.Encryption.AEAD
         public void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
         {
             int ret = Sodium.crypto_generichash_blake2b_salt_personal(sessionKey, keyLen, IntPtr.Zero, 0, masterKey,
-                keyLen, salt, PersonalBytes);
+                                                                      keyLen, salt, PersonalBytes);
             if (ret != 0) throw new System.Exception("failed to generate session key");
         }
 
-        protected void IncrementNonce()
-        {
-            Sodium.sodium_increment(_nonce, nonceLen);
-        }
+        protected void IncrementNonce() { Sodium.sodium_increment(_nonce, nonceLen); }
 
-        protected virtual void initCipher(byte[] salt, bool isCipher)
+        protected virtual void InitCipher(byte[] salt, bool isCipher, bool isUdp)
         {
-            if (isCipher)
-            {
+            if (isCipher) {
                 _encryptSalt = new byte[saltLen];
                 Array.Copy(salt, _encryptSalt, saltLen);
-            }
-            else
-            {
+            } else {
                 _decryptSalt = new byte[saltLen];
                 Array.Copy(salt, _decryptSalt, saltLen);
             }
         }
 
-        protected static void randBytes(byte[] buf, int length)
-        {
-            RNG.GetBytes(buf, length);
-        }
+        protected static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
 
-        #region Cipher-specific implementations
+        #region Wrapper for encryption/decryption
 
-        /// <summary>
-        /// Encrypt wrapper
-        /// </summary>
-        /// <param name="key"></param>
-        /// <param name="buf">plaintext</param>
-        /// <param name="length">plen</param>
-        /// <param name="outbuf">ciphertext + tag</param>
-        /// <param name="outlength">plen + tlen</param>
-        /// <returns></returns>
-        protected abstract int cipherEncrypt(byte[] key, byte[] buf, int length, byte[] outbuf, ref int outlength);
+        protected abstract int cipherEncrypt(byte[] key, byte[] plaintext, int plen, byte[] ciphertext, ref int clen);
 
-        /// <summary>
-        /// Decrypt wrapper
-        /// </summary>
-        /// <param name="key"></param>
-        /// <param name="buf">ciphertext + tag</param>
-        /// <param name="length">clen + tlen</param>
-        /// <param name="outbuf">plaintext</param>
-        /// <param name="outlength">plen</param>
-        /// <returns></returns>
-        protected abstract int cipherDecrypt(byte[] key, byte[] buf, int length, byte[] outbuf, ref int outlength);
-
+        protected abstract int cipherDecrypt(byte[] key, byte[] ciphertext, int clen, byte[] plaintext, ref int plen);
 
         #endregion
 
@@ -180,21 +149,17 @@ namespace Fuckshadows.Encryption.AEAD
 
         public override void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
-            if (!_encryptSaltSent)
-            {
+            if (! _encryptSaltSent) {
                 // Generate salt
                 randBytes(outbuf, saltLen);
-                initCipher(outbuf, true);
+                InitCipher(outbuf, true, false);
                 _encryptSaltSent = true;
-                lock (tempbuf)
-                {
+                lock (tempbuf) {
                     //cipherEncrypt(false, length, buf, tempbuf);
                     outlength = length + tagLen * 2 + saltLen + CHUNK_LEN_BYTES;
                     Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
                 }
-            }
-            else
-            {
+            } else {
                 outlength = length + tagLen * 2 + CHUNK_LEN_BYTES;
                 //cipherEncrypt(false, length, buf, outbuf);
             }
@@ -204,10 +169,9 @@ namespace Fuckshadows.Encryption.AEAD
         {
             // Generate salt
             randBytes(outbuf, saltLen);
-            initCipher(outbuf, true);
+            InitCipher(outbuf, true, true);
             _encryptSaltSent = true;
-            lock (tempbuf)
-            {
+            lock (tempbuf) {
                 //cipherEncrypt(true, length, buf, tempbuf);
                 outlength = length + tagLen + saltLen;
                 Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
@@ -216,29 +180,22 @@ namespace Fuckshadows.Encryption.AEAD
 
         public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
-            if (!_decryptSaltReceived)
-            {
+            if (! _decryptSaltReceived) {
                 _decryptSaltReceived = true;
                 // Get IV from first packet
-                initCipher(buf, false);
+                InitCipher(buf, false, false);
                 outlength = length - saltLen;
-                lock (tempbuf)
-                {
+                lock (tempbuf) {
                     Buffer.BlockCopy(buf, saltLen, tempbuf, 0, length - saltLen);
                     //cipherUpdate(false, length - ivLen, tempbuf, outbuf);
                 }
-            }
-            else
-            {
+            } else {
                 outlength = length;
                 //cipherUpdate(false, length, buf, outbuf);
             }
         }
 
-        public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
-        {
-            throw new NotImplementedException();
-        }
+        public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
 
         #endregion
 
@@ -251,12 +208,8 @@ namespace Fuckshadows.Encryption.AEAD
             throw new NotImplementedException();
         }
 
-        private void ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
-        {
-            throw new NotImplementedException();
-        }
+        private void ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
 
         #endregion
-
     }
 }
