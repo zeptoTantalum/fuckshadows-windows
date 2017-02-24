@@ -187,11 +187,11 @@ namespace test
                     IEncryptor decryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!");
                     RunStreamEncryptionRound(encryptor, decryptor);
                 }
-                for (int i = 0; i < 100; i++) {
-                    IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
-                    IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
-                    RunAEADEncryptionRound(encryptor, decryptor);
-                }
+//                for (int i = 0; i < 100; i++) {
+//                    IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+//                    IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+//                    RunAEADEncryptionRound(encryptor, decryptor);
+//                }
             }
             catch
             {
