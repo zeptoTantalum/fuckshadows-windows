@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text;
 using System.Net;
 using Cyotek.Collections.Generic;
@@ -14,7 +15,7 @@ namespace Fuckshadows.Encryption.Stream
         protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
-        protected CircularBuffer<byte> CircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 4, false);
+        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 4, false);
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
@@ -72,14 +73,10 @@ namespace Fuckshadows.Encryption.Stream
             byte[] result = new byte[password.Length + 16];
             int i = 0;
             byte[] md5sum = null;
-            while (i < key.Length)
-            {
-                if (i == 0)
-                {
+            while (i < key.Length) {
+                if (i == 0) {
                     md5sum = MbedTLS.MD5(password);
-                }
-                else
-                {
+                } else {
                     md5sum.CopyTo(result, 0);
                     password.CopyTo(result, md5sum.Length);
                     md5sum = MbedTLS.MD5(result);
@@ -89,44 +86,34 @@ namespace Fuckshadows.Encryption.Stream
             }
         }
 
-        protected virtual void initCipher(byte[] iv, bool isCipher)
+        protected virtual void initCipher(byte[] iv, bool isEncrypt)
         {
-            if (isCipher)
-            {
+            if (isEncrypt) {
                 _encryptIV = new byte[ivLen];
                 Array.Copy(iv, _encryptIV, ivLen);
-            }
-            else
-            {
+            } else {
                 _decryptIV = new byte[ivLen];
                 Array.Copy(iv, _decryptIV, ivLen);
             }
         }
 
-        protected abstract void cipherUpdate(bool isCipher, int length, byte[] buf, byte[] outbuf);
+        protected abstract void cipherUpdate(bool isEncrypt, int length, byte[] buf, byte[] outbuf);
 
-        protected static void randBytes(byte[] buf, int length)
-        {
-            RNG.GetBytes(buf, length);
-        }
+        protected static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
 
         public override void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
-            if (!_encryptIVSent)
-            {
+            if (! _encryptIVSent) {
                 // Generate IV
                 randBytes(outbuf, ivLen);
                 initCipher(outbuf, true);
                 _encryptIVSent = true;
-                lock (tempbuf)
-                {
+                lock (tempbuf) {
                     cipherUpdate(true, length, buf, tempbuf);
                     outlength = length + ivLen;
                     Buffer.BlockCopy(tempbuf, 0, outbuf, ivLen, length);
                 }
-            }
-            else
-            {
+            } else {
                 outlength = length;
                 cipherUpdate(true, length, buf, outbuf);
             }
@@ -137,8 +124,7 @@ namespace Fuckshadows.Encryption.Stream
             // Generate IV
             randBytes(outbuf, ivLen);
             initCipher(outbuf, true);
-            lock (tempbuf)
-            {
+            lock (tempbuf) {
                 cipherUpdate(true, length, buf, tempbuf);
                 outlength = length + ivLen;
                 Buffer.BlockCopy(tempbuf, 0, outbuf, ivLen, length);
@@ -147,24 +133,23 @@ namespace Fuckshadows.Encryption.Stream
 
         public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
-            if (!_decryptIVReceived)
-            {
-                _decryptIVReceived = true;
-                // Get IV from first packet
-                initCipher(buf, false);
-                outlength = length - ivLen;
-                lock (tempbuf)
-                {
-                    // C# could be multi-threaded
-                    Buffer.BlockCopy(buf, ivLen, tempbuf, 0, length - ivLen);
-                    cipherUpdate(false, length - ivLen, tempbuf, outbuf);
+            Debug.Assert(_circularBuffer != null, "_circularBuffer != null");
+            _circularBuffer.Put(buf, 0, length);
+            if (! _decryptIVReceived) {
+                if (_circularBuffer.Size <= ivLen) {
+                    // we need more data
+                    throw new CryptoNeedMoreException();
                 }
+                // start decryption
+                _decryptIVReceived = true;
+                byte[] iv = _circularBuffer.Get(ivLen);
+                initCipher(iv, false);
             }
-            else
-            {
-                outlength = length;
-                cipherUpdate(false, length, buf, outbuf);
-            }
+            byte[] cipher = _circularBuffer.Get(_circularBuffer.Size);
+
+            cipherUpdate(false, cipher.Length, cipher, outbuf);
+            outlength = cipher.Length;
+            // done the decryption
         }
 
         public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
@@ -172,8 +157,7 @@ namespace Fuckshadows.Encryption.Stream
             // Get IV from first pos
             initCipher(buf, false);
             outlength = length - ivLen;
-            lock (tempbuf)
-            {
+            lock (tempbuf) {
                 // C# could be multi-threaded
                 Buffer.BlockCopy(buf, ivLen, tempbuf, 0, length - ivLen);
                 cipherUpdate(false, length - ivLen, tempbuf, outbuf);

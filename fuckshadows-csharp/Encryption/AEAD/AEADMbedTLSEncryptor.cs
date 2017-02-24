@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -30,11 +31,11 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected override Dictionary<string, EncryptorInfo> getCiphers() { return _ciphers; }
 
-        protected override void InitCipher(byte[] salt, bool isCipher, bool isUdp)
+        protected override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
         {
-            base.InitCipher(salt, isCipher, isUdp);
+            base.InitCipher(salt, isEncrypt, isUdp);
             IntPtr ctx = Marshal.AllocHGlobal(MbedTLS.cipher_get_size_ex());
-            if (isCipher) {
+            if (isEncrypt) {
                 _encryptCtx = ctx;
             } else {
                 _decryptCtx = ctx;
@@ -44,41 +45,47 @@ namespace Fuckshadows.Encryption.AEAD
                 throw new System.Exception("Cannot initialize mbed TLS cipher context");
 
             if (isUdp) {
-                CipherSetKey(isCipher, _Masterkey);
+                CipherSetKey(isEncrypt, _Masterkey);
             } else {
-                DeriveSessionKey(isCipher ? _encryptSalt : _decryptSalt,
+                DeriveSessionKey(isEncrypt ? _encryptSalt : _decryptSalt,
                     _Masterkey, _sessionKey);
-                CipherSetKey(isCipher, _sessionKey);
+                CipherSetKey(isEncrypt, _sessionKey);
             }
         }
 
         // UDP: master key
         // TCP: session key
-        private void CipherSetKey(bool isCipher, byte[] key)
+        private void CipherSetKey(bool isEncrypt, byte[] key)
         {
-            IntPtr ctx = isCipher ? _encryptCtx : _decryptCtx;
-            int ret = MbedTLS.cipher_setkey(ctx, key, keyLen * 8, isCipher ? MbedTLS.MBEDTLS_ENCRYPT : MbedTLS.MBEDTLS_DECRYPT);
+            IntPtr ctx = isEncrypt ? _encryptCtx : _decryptCtx;
+            int ret = MbedTLS.cipher_setkey(ctx, key, keyLen * 8, isEncrypt ? MbedTLS.MBEDTLS_ENCRYPT : MbedTLS.MBEDTLS_DECRYPT);
             if (ret != 0) throw new System.Exception("failed to set key");
             ret = MbedTLS.cipher_reset(ctx);
             if (ret != 0) throw new System.Exception("failed to finish preparation");
         }
 
-        protected override int cipherEncrypt(byte[] key, byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
+        protected override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
         {
             // buf: all plaintext
             // outbuf: ciphertext + tag
             int ret;
             byte[] tagbuf = new byte[tagLen];
+            int olen = 0;
             switch (_cipher) {
                 case CIPHER_AES:
                     ret = MbedTLS.cipher_auth_encrypt(_encryptCtx,
+                                                      /* nonce */
                                                       _nonce, nonceLen,
+                                                      /* AD */
                                                       IntPtr.Zero, 0,
+                                                      /* plain */
                                                       plaintext, plen,
-                                                      ciphertext, ref plen,
+                                                      /* cipher */
+                                                      ciphertext, ref olen,
                                                       tagbuf, tagLen);
                     if (ret != 0) throw new CryptoErrorException();
-
+                    Debug.Assert(olen == plen);
+                    // attach tag to ciphertext
                     Buffer.BlockCopy(tagbuf, 0, ciphertext, plen, tagLen);
                     clen = plen + tagLen;
                     return ret;
@@ -87,11 +94,12 @@ namespace Fuckshadows.Encryption.AEAD
             }
         }
 
-        protected override int cipherDecrypt(byte[] key, byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
+        protected override int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
         {
             // buf: ciphertext + tag
             // outbuf: plaintext
             int ret;
+            int olen = 0;
             // split tag
             byte[] tagbuf = new byte[tagLen];
             Buffer.BlockCopy(ciphertext, clen - tagLen, tagbuf, 0, tagLen);
@@ -101,10 +109,10 @@ namespace Fuckshadows.Encryption.AEAD
                                                       _nonce, nonceLen,
                                                       IntPtr.Zero, 0,
                                                       ciphertext, clen - tagLen,
-                                                      plaintext, ref plen,
+                                                      plaintext, ref olen,
                                                       tagbuf, tagLen);
                     if (ret != 0) throw new CryptoErrorException();
-
+                    Debug.Assert(olen == clen - tagLen);
                     plen = clen - tagLen;
                     return ret;
                 default:

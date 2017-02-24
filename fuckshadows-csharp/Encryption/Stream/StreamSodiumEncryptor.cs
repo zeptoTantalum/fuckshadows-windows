@@ -42,7 +42,7 @@ namespace Fuckshadows.Encryption.Stream
             return new List<string>(_ciphers.Keys);
         }
 
-        protected override void cipherUpdate(bool isCipher, int length, byte[] buf, byte[] outbuf)
+        protected override void cipherUpdate(bool isEncrypt, int length, byte[] buf, byte[] outbuf)
         {
             // TODO write a unidirection cipher so we don't have to if if if
             int bytesRemaining;
@@ -50,7 +50,7 @@ namespace Fuckshadows.Encryption.Stream
             byte[] sodiumBuf;
             byte[] iv;
 
-            if (isCipher)
+            if (isEncrypt)
             {
                 bytesRemaining = _encryptBytesRemaining;
                 ic = _encryptIC;
@@ -84,7 +84,7 @@ namespace Fuckshadows.Encryption.Stream
             ic += (ulong)padding / SODIUM_BLOCK_SIZE;
             bytesRemaining = padding % SODIUM_BLOCK_SIZE;
 
-            if (isCipher)
+            if (isEncrypt)
             {
                 _encryptBytesRemaining = bytesRemaining;
                 _encryptIC = ic;

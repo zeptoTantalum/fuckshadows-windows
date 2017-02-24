@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Cyotek.Collections.Generic;
 using Fuckshadows.Encryption;
 using Fuckshadows.Encryption.Exception;
 
@@ -17,9 +19,13 @@ namespace Fuckshadows.Encryption.AEAD
         private const string Personal = "fuckshadows-g3nk";
         private static readonly byte[] PersonalBytes = Encoding.ASCII.GetBytes(Personal);
 
-        private const int CHUNK_LEN_BYTES = 2;
-
         protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
+
+        // every connection should create its own buffer
+        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 4, false);
+
+        private const int CHUNK_LEN_BYTES = 2;
+        private const int CHUNK_LEN_MASK = 0x3FFF;
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
@@ -38,40 +44,10 @@ namespace Fuckshadows.Encryption.AEAD
         protected byte[] _encryptSalt;
         protected byte[] _decryptSalt;
 
-
         protected byte[] _nonce;
         // Is first packet
         protected bool _decryptSaltReceived;
         protected bool _encryptSaltSent;
-
-        #region unprocessed data buffer for each connection
-
-        private class unprocessedBuf
-        {
-            private const int BufLen = 16 * 1024;
-            private byte[] buf = new byte[BufLen];
-            public int unprocessedBufLen { get; private set; } = 0;
-            public bool isDirty { get; private set; } = false;
-
-            public void Add(byte[] src, int srcIdx, int Len)
-            {
-                if (isDirty) throw new System.Exception("already have data");
-                if (Len > BufLen) throw new System.Exception("too long");
-                Buffer.BlockCopy(src, srcIdx, buf, 0, Len);
-                unprocessedBufLen = Len;
-                isDirty = true;
-            }
-
-            public void Take(byte[] dst, int dstIdx, int Len)
-            {
-                if (! isDirty) throw new System.Exception("no data to take");
-                Buffer.BlockCopy(buf, 0, dst, dstIdx, Len);
-                unprocessedBufLen -= Len;
-                isDirty = unprocessedBufLen > 0;
-            }
-        }
-
-        #endregion
 
         public AEADEncryptor(string method, string password)
             : base(method, password)
@@ -84,7 +60,7 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected abstract Dictionary<string, EncryptorInfo> getCiphers();
 
-        private void InitEncryptorInfo(string method)
+        protected void InitEncryptorInfo(string method)
         {
             method = method.ToLower();
             _method = method;
@@ -101,7 +77,7 @@ namespace Fuckshadows.Encryption.AEAD
             nonceLen = CipherInfo.NonceSize;
         }
 
-        private void InitKey(string password)
+        protected void InitKey(string password)
         {
             byte[] passbuf = Encoding.UTF8.GetBytes(password);
             if (_Masterkey == null) _Masterkey = new byte[keyLen];
@@ -123,11 +99,14 @@ namespace Fuckshadows.Encryption.AEAD
             if (ret != 0) throw new System.Exception("failed to generate session key");
         }
 
-        protected void IncrementNonce() { Sodium.sodium_increment(_nonce, nonceLen); }
-
-        protected virtual void InitCipher(byte[] salt, bool isCipher, bool isUdp)
+        protected void IncrementNonce()
         {
-            if (isCipher) {
+                Sodium.sodium_increment(_nonce, nonceLen);
+        }
+
+        protected virtual void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
+        {
+            if (isEncrypt) {
                 _encryptSalt = new byte[saltLen];
                 Array.Copy(salt, _encryptSalt, saltLen);
             } else {
@@ -136,15 +115,11 @@ namespace Fuckshadows.Encryption.AEAD
             }
         }
 
-        protected static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
+        public static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
 
-        #region Wrapper for encryption/decryption
+        protected abstract int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen);
 
-        protected abstract int cipherEncrypt(byte[] key, byte[] plaintext, int plen, byte[] ciphertext, ref int clen);
-
-        protected abstract int cipherDecrypt(byte[] key, byte[] ciphertext, int clen, byte[] plaintext, ref int plen);
-
-        #endregion
+        protected abstract int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen);
 
         #region API for other module
 
@@ -181,19 +156,21 @@ namespace Fuckshadows.Encryption.AEAD
 
         public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
+            Debug.Assert(_circularBuffer != null, "_circularBuffer != null");
+            // drop all into buffer
+            _circularBuffer.Put(buf, 0, length);
             if (! _decryptSaltReceived) {
-                _decryptSaltReceived = true;
-                // Get IV from first packet
-                InitCipher(buf, false, false);
-                outlength = length - saltLen;
-                lock (tempbuf) {
-                    Buffer.BlockCopy(buf, saltLen, tempbuf, 0, length - saltLen);
-                    //cipherUpdate(false, length - ivLen, tempbuf, outbuf);
+                // check if we get all of them
+                if (_circularBuffer.Size <= saltLen) {
+                    // need more
+                    throw new CryptoNeedMoreException();
                 }
-            } else {
-                outlength = length;
-                //cipherUpdate(false, length, buf, outbuf);
+                _decryptSaltReceived = true;
+                byte[] salt = _circularBuffer.Get(saltLen);
+                InitCipher(salt, false, false);
             }
+            // handle chunks
+            throw new NotImplementedException();
         }
 
         public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
@@ -202,14 +179,12 @@ namespace Fuckshadows.Encryption.AEAD
 
         #region Private handling
 
-        private void ChunkEncrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
+        protected void ChunkEncrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
-            int err;
-            int clen;
             throw new NotImplementedException();
         }
 
-        private void ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
+        protected void ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
 
         #endregion
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ namespace Fuckshadows.Encryption.AEAD
         private const int CIPHER_CHACHA20IETFPOLY1305 = 2;
         private const int CIPHER_XCHACHA20IETFPOLY1305 = 3;
 
+        private byte[] _sodiumKey;
         public AEADSodiumEncryptor(string method, string password)
             : base(method, password) { }
 
@@ -28,67 +30,86 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected override Dictionary<string, EncryptorInfo> getCiphers() { return _ciphers; }
 
-        protected override int cipherEncrypt(byte[] key, byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
+        protected override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
+        {
+            base.InitCipher(salt, isEncrypt, isUdp);
+            if (isUdp) {
+                _sodiumKey = _Masterkey;
+            }
+            else
+            {
+                DeriveSessionKey(isEncrypt ? _encryptSalt : _decryptSalt,
+                    _Masterkey, _sessionKey);
+                _sodiumKey = _sessionKey;
+            }
+        }
+
+        protected override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
         {
             // buf: all plaintext
             // outbuf: ciphertext + tag
             byte[] tagbuf = new byte[tagLen];
             int ret;
+            int encClen = 0;
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
-                    ret = Sodium.crypto_aead_chacha20poly1305_encrypt(ciphertext, ref clen,
+                    ret = Sodium.crypto_aead_chacha20poly1305_encrypt(ciphertext, ref encClen,
                                                                       plaintext, plen,
                                                                       IntPtr.Zero, 0,
                                                                       IntPtr.Zero, _nonce,
-                                                                      key);
+                                                                      _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
-                    ret = Sodium.crypto_aead_chacha20poly1305_ietf_encrypt(ciphertext, ref clen,
+                    ret = Sodium.crypto_aead_chacha20poly1305_ietf_encrypt(ciphertext, ref encClen,
                                                                            plaintext, plen,
                                                                            IntPtr.Zero, 0,
                                                                            IntPtr.Zero, _nonce,
-                                                                           key);
+                                                                           _sodiumKey);
 
                     break;
                 default:
                     throw new System.Exception("not implemented");
             }
-
             if (ret != 0) throw new CryptoErrorException();
+            // TODO: not sure
+            // Debug.Assert(encClen == plen + tagLen);
             Buffer.BlockCopy(tagbuf, 0, ciphertext, plen, tagLen);
             clen = plen + tagLen;
             return ret;
         }
 
-        protected override int cipherDecrypt(byte[] key, byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
+        protected override int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
         {
             // buf: ciphertext + tag
             // outbuf: plaintext
             int ret;
+            int decPlen = 0;
             // split tag
             byte[] tagbuf = new byte[tagLen];
             Buffer.BlockCopy(ciphertext, clen - tagLen, tagbuf, 0, tagLen);
 
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
-                    ret = Sodium.crypto_aead_chacha20poly1305_decrypt(plaintext, ref plen,
+                    ret = Sodium.crypto_aead_chacha20poly1305_decrypt(plaintext, ref decPlen,
                                                                       IntPtr.Zero,
                                                                       ciphertext, clen,
                                                                       IntPtr.Zero, 0,
-                                                                      _nonce, key);
+                                                                      _nonce, _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
-                    ret = Sodium.crypto_aead_chacha20poly1305_ietf_decrypt(plaintext, ref plen,
+                    ret = Sodium.crypto_aead_chacha20poly1305_ietf_decrypt(plaintext, ref decPlen,
                                                                            IntPtr.Zero,
                                                                            ciphertext, clen,
                                                                            IntPtr.Zero, 0,
-                                                                           _nonce, key);
+                                                                           _nonce, _sodiumKey);
                     break;
                 default:
                     throw new System.Exception("not implemented");
             }
 
             if (ret != 0) throw new CryptoErrorException();
+            // TODO: not sure
+            // Debug.Assert(decPlen == plen);
             plen = clen - tagLen;
             return ret;
         }

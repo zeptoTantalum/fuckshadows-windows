@@ -16,12 +16,48 @@ namespace test
     [TestFixture]
     public class UnitTest
     {
-        private void RunEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
+        private void RunStreamEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
         {
             RNG.Reload();
             byte[] plain = new byte[16384];
-            byte[] cipher = new byte[plain.Length + 16];
-            byte[] plain2 = new byte[plain.Length + 16];
+            const int IV = 16;
+            byte[] cipher = new byte[plain.Length + IV];
+            byte[] plain2 = new byte[plain.Length + IV];
+            int outLen = 0;
+            int outLen2 = 0;
+
+            _random.NextBytes(plain);
+            encryptor.Encrypt(plain, plain.Length, cipher, out outLen);
+            decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
+            Assert.AreEqual(plain.Length, outLen2);
+            for (int j = 0; j < plain.Length; j++)
+            {
+                Assert.AreEqual(plain[j], plain2[j]);
+            }
+            encryptor.Encrypt(plain, 1000, cipher, out outLen);
+            decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
+            Assert.AreEqual(1000, outLen2);
+            for (int j = 0; j < outLen2; j++)
+            {
+                Assert.AreEqual(plain[j], plain2[j]);
+            }
+            encryptor.Encrypt(plain, 12333, cipher, out outLen);
+            decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
+            Assert.AreEqual(12333, outLen2);
+            for (int j = 0; j < outLen2; j++)
+            {
+                Assert.AreEqual(plain[j], plain2[j]);
+            }
+        }
+
+        private void RunAEADEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
+        {
+            RNG.Reload();
+            byte[] plain = new byte[16384];
+            const int Salt = 16;
+            // make the cipher array large enough to hold chunks
+            byte[] cipher = new byte[plain.Length * 4 + Salt];
+            byte[] plain2 = new byte[plain.Length + Salt];
             int outLen = 0;
             int outLen2 = 0;
 
@@ -149,7 +185,12 @@ namespace test
                 {
                     IEncryptor encryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!");
                     IEncryptor decryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!");
-                    RunEncryptionRound(encryptor, decryptor);
+                    RunStreamEncryptionRound(encryptor, decryptor);
+                }
+                for (int i = 0; i < 100; i++) {
+                    IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+                    IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+                    RunAEADEncryptionRound(encryptor, decryptor);
                 }
             }
             catch
@@ -187,7 +228,7 @@ namespace test
                 {
                     IEncryptor encryptor = new StreamMbedTLSEncryptor("rc4-md5", "barfoo!");
                     IEncryptor decryptor = new StreamMbedTLSEncryptor("rc4-md5", "barfoo!");
-                    RunEncryptionRound(encryptor, decryptor);
+                    RunStreamEncryptionRound(encryptor, decryptor);
                 }
             }
             catch
@@ -225,8 +266,14 @@ namespace test
                 {
                     IEncryptor encryptor = new StreamSodiumEncryptor("salsa20", "barfoo!");
                     IEncryptor decryptor = new StreamSodiumEncryptor("salsa20", "barfoo!");
-                    RunEncryptionRound(encryptor, decryptor);
+                    RunStreamEncryptionRound(encryptor, decryptor);
                 }
+//                for (int i = 0; i < 100; i++)
+//                {
+//                    IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
+//                    IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
+//                    RunAEADEncryptionRound(encryptor, decryptor);
+//                }
             }
             catch
             {

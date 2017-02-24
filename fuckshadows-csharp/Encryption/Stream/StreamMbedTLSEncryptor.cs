@@ -44,11 +44,11 @@ namespace Fuckshadows.Encryption.Stream
             return _ciphers;
         }
 
-        protected override void initCipher(byte[] iv, bool isCipher)
+        protected override void initCipher(byte[] iv, bool isEncrypt)
         {
-            base.initCipher(iv, isCipher);
+            base.initCipher(iv, isEncrypt);
             IntPtr ctx = Marshal.AllocHGlobal(MbedTLS.cipher_get_size_ex());
-            if (isCipher)
+            if (isEncrypt)
             {
                 _encryptCtx = ctx;
             }
@@ -84,7 +84,7 @@ namespace Fuckshadows.Encryption.Stream
              *  
              */
             if (MbedTLS.cipher_setkey(ctx, realkey, keyLen * 8,
-                isCipher ? MbedTLS.MBEDTLS_ENCRYPT : MbedTLS.MBEDTLS_DECRYPT) != 0 )
+                isEncrypt ? MbedTLS.MBEDTLS_ENCRYPT : MbedTLS.MBEDTLS_DECRYPT) != 0 )
                 throw new System.Exception("Cannot set mbed TLS cipher key");
             if (MbedTLS.cipher_set_iv(ctx, iv, ivLen) != 0)
                 throw new System.Exception("Cannot set mbed TLS cipher IV");
@@ -92,14 +92,14 @@ namespace Fuckshadows.Encryption.Stream
                 throw new System.Exception("Cannot finalize mbed TLS cipher context");
         }
 
-        protected override void cipherUpdate(bool isCipher, int length, byte[] buf, byte[] outbuf)
+        protected override void cipherUpdate(bool isEncrypt, int length, byte[] buf, byte[] outbuf)
         {
             // C# could be multi-threaded
             if (_disposed)
             {
                 throw new ObjectDisposedException(this.ToString());
             }
-            if (MbedTLS.cipher_update(isCipher ? _encryptCtx : _decryptCtx,
+            if (MbedTLS.cipher_update(isEncrypt ? _encryptCtx : _decryptCtx,
                 buf, length, outbuf, ref length) != 0 )
                 throw new System.Exception("Cannot update mbed TLS cipher context");
         }
