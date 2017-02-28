@@ -148,6 +148,20 @@ namespace Fuckshadows.Controller
         private byte[] _firstPacket;
         private int _firstPacketLength;
 
+        private const int MAX_DOMAIN_LEN = 255;
+        private const int ADDR_PORT_LEN = 2;
+        private const int ADDR_ATYP_LEN = 1;
+
+        private const int ATYP_IPv4 = 0x01;
+        private const int ATYP_DOMAIN = 0x03;
+        private const int ATYP_IPv6 = 0x04;
+
+        private const int CMD_CONNECT = 0x01;
+        private const int CMD_UDP_ASSOC = 0x03;
+
+        private byte[] _addrBuf = new byte[ADDR_ATYP_LEN + MAX_DOMAIN_LEN + ADDR_PORT_LEN];
+        private int _addrBufLength;
+
         private int _totalRead = 0;
         private int _totalWrite = 0;
 
@@ -299,7 +313,7 @@ namespace Fuckshadows.Controller
                 // Skip first 3 bytes, and read 2 more bytes to analysis the address.
                 // 2 more bytes is designed if address is domain then we don't need to read once more to get the addr length.
                 // TODO validate
-                _connection.BeginReceive(_connetionRecvBuffer, 0, 3 + 2, SocketFlags.None,
+                _connection.BeginReceive(_connetionRecvBuffer, 0, 3 + ADDR_ATYP_LEN + 1, SocketFlags.None,
                     new AsyncCallback(handshakeReceive2Callback), null);
             }
             catch (Exception e)
@@ -318,20 +332,20 @@ namespace Fuckshadows.Controller
                 if (bytesRead >= 5)
                 {
                     _command = _connetionRecvBuffer[1];
-                    if (_command != 1 && _command != 3)
+                    if (_command != CMD_CONNECT && _command != CMD_UDP_ASSOC)
                     {
                         Logging.Debug("Unsupported CMD=" + _command);
                         Close();
                     }
                     else
                     {
-                        if (_command == 1)
+                        if (_command == CMD_CONNECT)
                         {
                             byte[] response = {5, 0, 0, 1, 0, 0, 0, 0, 0, 0};
                             _connection.BeginSend(response, 0, response.Length, SocketFlags.None,
                                 new AsyncCallback(ResponseCallback), null);
                         }
-                        else if (_command == 3)
+                        else if (_command == CMD_UDP_ASSOC)
                         {
                             ReadAddress(HandleUDPAssociate);
                         }
@@ -371,14 +385,14 @@ namespace Fuckshadows.Controller
 
             switch (atyp)
             {
-                case 1: // IPv4 address, 4 bytes
+                case ATYP_IPv4: // IPv4 address, 4 bytes
                     ReadAddress(4 + 2 - 1, onSuccess);
                     break;
-                case 3: // domain name, length + str
+                case ATYP_DOMAIN: // domain name, length + str
                     int len = _connetionRecvBuffer[4];
                     ReadAddress(len + 2, onSuccess);
                     break;
-                case 4: // IPv6 address, 16 bytes
+                case ATYP_IPv6: // IPv6 address, 16 bytes
                     ReadAddress(16 + 2 - 1, onSuccess);
                     break;
                 default:
@@ -390,6 +404,7 @@ namespace Fuckshadows.Controller
 
         private void ReadAddress(int bytesRemain, Action onSuccess)
         {
+            // drop [ VER | CMD |  RSV  ]
             Array.Copy(_connetionRecvBuffer, 3, _connetionRecvBuffer, 0, 2);
 
             // Read the remain address bytes
@@ -419,23 +434,30 @@ namespace Fuckshadows.Controller
                     int dst_port = -1;
                     switch (atyp)
                     {
-                        case 1: // IPv4 address, 4 bytes
+                        case ATYP_IPv4: // IPv4 address, 4 bytes
                             dst_addr = new IPAddress(_connetionRecvBuffer.Skip(1).Take(4).ToArray()).ToString();
                             dst_port = (_connetionRecvBuffer[5] << 8) + _connetionRecvBuffer[6];
 
+                            _addrBufLength = ADDR_ATYP_LEN + 4 + ADDR_PORT_LEN;
                             break;
-                        case 3: // domain name, length + str
+                        case ATYP_DOMAIN: // domain name, length + str
                             int len = _connetionRecvBuffer[1];
                             dst_addr = System.Text.Encoding.UTF8.GetString(_connetionRecvBuffer, 2, len);
                             dst_port = (_connetionRecvBuffer[len + 2] << 8) + _connetionRecvBuffer[len + 3];
 
+                            _addrBufLength = ADDR_ATYP_LEN + 1 + len + ADDR_PORT_LEN;
                             break;
-                        case 4: // IPv6 address, 16 bytes
+                        case ATYP_IPv6: // IPv6 address, 16 bytes
                             dst_addr = $"[{new IPAddress(_connetionRecvBuffer.Skip(1).Take(16).ToArray())}]";
                             dst_port = (_connetionRecvBuffer[17] << 8) + _connetionRecvBuffer[18];
 
+                            _addrBufLength = ADDR_ATYP_LEN + 16 + ADDR_PORT_LEN;
                             break;
                     }
+
+                    /* prepare address buffer for AEAD */
+                    Buffer.BlockCopy(_connetionRecvBuffer, 0, _addrBuf, 0, _addrBufLength);
+
                     if (_config.isVerboseLogging)
                     {
                         Logging.Info($"connect to {dst_addr}:{dst_port}");
@@ -443,7 +465,7 @@ namespace Fuckshadows.Controller
 
                     _destEndPoint = SocketUtil.GetEndPoint(dst_addr, dst_port);
 
-                    onSuccess.Invoke();
+                    onSuccess.Invoke(); /* StartConnect() */
                 }
                 else
                 {
@@ -463,15 +485,15 @@ namespace Fuckshadows.Controller
             IPEndPoint endPoint = (IPEndPoint) _connection.LocalEndPoint;
             byte[] address = endPoint.Address.GetAddressBytes();
             int port = endPoint.Port;
-            byte[] response = new byte[4 + address.Length + 2];
+            byte[] response = new byte[4 + address.Length + ADDR_PORT_LEN];
             response[0] = 5;
             switch (endPoint.AddressFamily)
             {
                 case AddressFamily.InterNetwork:
-                    response[3] = 1;
+                    response[3] = ATYP_IPv4;
                     break;
                 case AddressFamily.InterNetworkV6:
-                    response[3] = 4;
+                    response[3] = ATYP_IPv6;
                     break;
             }
             address.CopyTo(response, 4);
