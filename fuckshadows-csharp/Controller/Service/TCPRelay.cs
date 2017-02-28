@@ -806,6 +806,7 @@ namespace Fuckshadows.Controller
                         catch (CryptoErrorException)
                         {
                             Close();
+                            return;
                         }
                     }
                     if (bytesToSend == 0) {
