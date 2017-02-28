@@ -16,7 +16,6 @@ namespace Fuckshadows.Encryption.AEAD
         : EncryptorBase
     {
         // We are using the same saltLen and keyLen
-
         private const string Personal = "fuckshadows-g3nk";
         private static readonly byte[] PersonalBytes = Encoding.ASCII.GetBytes(Personal);
 
@@ -130,7 +129,7 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected abstract int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen);
 
-        #region API for other module
+        #region TCP
 
         public override void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
@@ -187,24 +186,44 @@ namespace Fuckshadows.Encryption.AEAD
                 _decryptSaltReceived = true;
                 byte[] salt = _decCircularBuffer.Get(saltLen);
                 InitCipher(salt, false, false);
+                _decryptSaltReceived = true;
             }
             // handle chunks
             throw new NotImplementedException();
         }
+
+        #endregion
+
+        #region UDP
 
         public override void EncryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
             // Generate salt
             randBytes(outbuf, saltLen);
             InitCipher(outbuf, true, true);
-            lock (_udpTmpBuf) {
-                //cipherEncrypt(true, length, buf, tempbuf);
-                outlength = length + tagLen + saltLen;
-                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, saltLen, length);
+            int olen = -1;
+            lock (_udpTmpBuf)
+            {
+                cipherEncrypt(buf, length, _udpTmpBuf, ref olen);
+                Debug.Assert(olen == length + tagLen);
+                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, saltLen, olen);
+                outlength = saltLen + olen;
             }
         }
 
-        public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
+        public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
+        {
+            InitCipher(buf, false, true);
+            int olen = -1;
+            lock (_udpTmpBuf)
+            {
+                // copy remaining data to first pos
+                Buffer.BlockCopy(buf, saltLen, buf, 0, length - saltLen);
+                cipherDecrypt(buf, length - saltLen, _udpTmpBuf, ref olen);
+                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, 0, olen);
+                outlength = olen;
+            }
+        }
 
         #endregion
 

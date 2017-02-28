@@ -80,7 +80,7 @@ namespace Fuckshadows.Encryption.AEAD
             // buf: ciphertext + tag
             // outbuf: plaintext
             int ret;
-            int decPlen = 0;
+            ulong decPlen = 0;
             // split tag
             byte[] tagbuf = new byte[tagLen];
             Buffer.BlockCopy(ciphertext, clen - tagLen, tagbuf, 0, tagLen);
@@ -89,14 +89,14 @@ namespace Fuckshadows.Encryption.AEAD
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_decrypt(plaintext, ref decPlen,
                                                                       IntPtr.Zero,
-                                                                      ciphertext, clen,
+                                                                      ciphertext, (ulong)clen,
                                                                       IntPtr.Zero, 0,
                                                                       _nonce, _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_decrypt(plaintext, ref decPlen,
                                                                            IntPtr.Zero,
-                                                                           ciphertext, clen,
+                                                                           ciphertext, (ulong)clen,
                                                                            IntPtr.Zero, 0,
                                                                            _nonce, _sodiumKey);
                     break;
@@ -105,8 +105,7 @@ namespace Fuckshadows.Encryption.AEAD
             }
 
             if (ret != 0) throw new CryptoErrorException();
-            // TODO: not sure
-            // Debug.Assert(decPlen == plen);
+            Debug.Assert((int)decPlen == clen - tagLen);
             plen = clen - tagLen;
             return ret;
         }
