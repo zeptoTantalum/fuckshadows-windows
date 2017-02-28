@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Cyotek.Collections.Generic;
@@ -50,6 +51,9 @@ namespace Fuckshadows.Encryption.AEAD
         // Is first packet
         protected bool _decryptSaltReceived;
         protected bool _encryptSaltSent;
+
+        // Is first chunk(tcp request)
+        protected bool _tcpRequestSent;
 
         public AEADEncryptor(string method, string password)
             : base(method, password)
@@ -127,20 +131,42 @@ namespace Fuckshadows.Encryption.AEAD
 
         public override void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
+            Debug.Assert(_encCircularBuffer != null, "_encCircularBuffer != null");
+            _encCircularBuffer.Put(buf, 0, length);
+            int cipherOffset = 0;
+            outlength = 0;
             if (! _encryptSaltSent) {
                 // Generate salt
-                randBytes(outbuf, saltLen);
-                InitCipher(outbuf, true, false);
+                byte[] saltBytes = new byte[saltLen];
+                randBytes(saltBytes, saltLen);
+                InitCipher(saltBytes, true, false);
+                Buffer.BlockCopy(saltBytes, 0, outbuf, 0, saltLen);
+                cipherOffset = saltLen;
+                outlength = saltLen;
                 _encryptSaltSent = true;
-
-                    //cipherEncrypt(false, length, buf, tempbuf);
-                    outlength = length + tagLen * 2 + saltLen + CHUNK_LEN_BYTES;
-                    //Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
-
-            } else {
-                outlength = length + tagLen * 2 + CHUNK_LEN_BYTES;
-                //cipherEncrypt(false, length, buf, outbuf);
             }
+
+            if (! _tcpRequestSent) {
+                // The first TCP request
+                int encAddrBufLength;
+                byte[] encAddrBufBytes = new byte[AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES];
+                byte[] addrBytes = new byte[AddrBufLength];
+                Buffer.BlockCopy(AddrBufBytes, 0, addrBytes, 0, AddrBufLength);
+
+                ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
+                Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
+                Buffer.BlockCopy(encAddrBufBytes, 0, outbuf, cipherOffset, encAddrBufLength);
+                cipherOffset += encAddrBufLength;
+                // skip address buffer
+                _encCircularBuffer.Skip(AddrBufLength);
+                outlength += encAddrBufLength;
+                _tcpRequestSent = true;
+            }
+
+            // handle other chunks
+            int chunklength = Math.Min(CHUNK_LEN_MASK, _encCircularBuffer.Size);
+            byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
+            throw new NotImplementedException();
         }
 
         public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
@@ -181,12 +207,61 @@ namespace Fuckshadows.Encryption.AEAD
 
         #region Private handling
 
-        protected void ChunkEncrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
+        protected void ChunkEncrypt(byte[] plaintext, int plainLen, byte[] ciphertext, out int cipherLen)
         {
-            throw new NotImplementedException();
+            int chunkLen = plainLen & CHUNK_LEN_MASK;
+            byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
+            byte[] encBytes = new byte[chunkLen + tagLen];
+            int encChunkLenLength = -1;
+            int encBufLength = - 1;
+            byte[] lenbuf = BitConverter.GetBytes((ushort) IPAddress.HostToNetworkOrder((short)chunkLen));
+  
+            // encrypt len
+            cipherEncrypt(lenbuf, 2, encLenBytes, ref encChunkLenLength);
+            Debug.Assert(encChunkLenLength == CHUNK_LEN_BYTES + tagLen);
+            IncrementNonce();
+
+            // encrypt corresponding data
+            cipherEncrypt(plaintext, chunkLen, encBytes, ref encBufLength);
+            Debug.Assert(encBufLength == chunkLen + tagLen);
+            IncrementNonce();
+
+            // construct outbuf
+            Buffer.BlockCopy(encLenBytes, 0, ciphertext, 0, encChunkLenLength);
+            Buffer.BlockCopy(encBytes, 0, ciphertext, encChunkLenLength, encBufLength);
+            cipherLen = encChunkLenLength + encBufLength;
         }
 
-        protected void ChunkDecrypt(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }
+        protected void ChunkDecrypt(byte[] ciphertext, int cipherLen, byte[] plaintext, out int plainLen)
+        {
+            // split buffer
+            byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
+            byte[] lenBytes = new byte[CHUNK_LEN_BYTES];
+            Buffer.BlockCopy(ciphertext, 0, encLenBytes, 0, CHUNK_LEN_BYTES + tagLen);
+
+            // decrypt chunk length
+            int decLenLength = - 1;
+            cipherDecrypt(encLenBytes, CHUNK_LEN_BYTES + tagLen, lenBytes, ref decLenLength);
+            Debug.Assert(decLenLength == CHUNK_LEN_BYTES);
+            int chunkLen = IPAddress.NetworkToHostOrder((short) BitConverter.ToUInt16(lenBytes, 0));
+            IncrementNonce();
+
+            byte[] encChunkBytes = new byte[chunkLen + tagLen];
+            
+            Buffer.BlockCopy(ciphertext, CHUNK_LEN_BYTES + tagLen, encChunkBytes, 0, chunkLen + tagLen);
+            Debug.Assert(chunkLen + tagLen + CHUNK_LEN_BYTES + tagLen == cipherLen);
+
+            // decrypt corresponding data
+            int decChunkLen = - 1;
+            byte[] chunkBytes = new byte[chunkLen];
+            cipherDecrypt(encChunkBytes, chunkLen + tagLen, chunkBytes, ref decChunkLen);
+            Debug.Assert(decChunkLen == chunkLen);
+            IncrementNonce();
+
+            // output plaintext
+            Buffer.BlockCopy(chunkBytes, 0, plaintext, 0, decChunkLen);
+            plainLen = chunkLen;
+        }
 
         #endregion
     }

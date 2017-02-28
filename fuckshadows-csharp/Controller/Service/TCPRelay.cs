@@ -10,6 +10,7 @@ using Fuckshadows.Encryption.Exception;
 using Fuckshadows.Model;
 using Fuckshadows.Proxy;
 using Fuckshadows.Util.Sockets;
+using static Fuckshadows.Encryption.EncryptorBase;
 
 namespace Fuckshadows.Controller
 {
@@ -93,7 +94,7 @@ namespace Fuckshadows.Controller
         }
     }
 
-    class TCPHandler
+    internal class TCPHandler
     {
         class AsyncSession
         {
@@ -148,20 +149,8 @@ namespace Fuckshadows.Controller
         private byte[] _firstPacket;
         private int _firstPacketLength;
 
-        private const int MAX_DOMAIN_LEN = 255;
-        private const int ADDR_PORT_LEN = 2;
-        private const int ADDR_ATYP_LEN = 1;
-
-        private const int ATYP_IPv4 = 0x01;
-        private const int ATYP_DOMAIN = 0x03;
-        private const int ATYP_IPv6 = 0x04;
-
         private const int CMD_CONNECT = 0x01;
         private const int CMD_UDP_ASSOC = 0x03;
-        
-        /* for AEAD first request chunk */
-        private byte[] _addrBuf = new byte[ADDR_ATYP_LEN + MAX_DOMAIN_LEN + ADDR_PORT_LEN];
-        private int _addrBufLength;
 
         private int _totalRead = 0;
         private int _totalWrite = 0;
@@ -433,31 +422,33 @@ namespace Fuckshadows.Controller
 
                     string dstAddr = "Unknown";
                     int dstPort = -1;
+                    int AddrBufLength = -1;
                     switch (atyp)
                     {
                         case ATYP_IPv4: // IPv4 address, 4 bytes
                             dstAddr = new IPAddress(_connetionRecvBuffer.Skip(1).Take(4).ToArray()).ToString();
                             dstPort = (_connetionRecvBuffer[5] << 8) + _connetionRecvBuffer[6];
 
-                            _addrBufLength = ADDR_ATYP_LEN + 4 + ADDR_PORT_LEN;
+                            AddrBufLength = ADDR_ATYP_LEN + 4 + ADDR_PORT_LEN;
                             break;
                         case ATYP_DOMAIN: // domain name, length + str
                             int len = _connetionRecvBuffer[1];
                             dstAddr = System.Text.Encoding.UTF8.GetString(_connetionRecvBuffer, 2, len);
                             dstPort = (_connetionRecvBuffer[len + 2] << 8) + _connetionRecvBuffer[len + 3];
 
-                            _addrBufLength = ADDR_ATYP_LEN + 1 + len + ADDR_PORT_LEN;
+                            AddrBufLength = ADDR_ATYP_LEN + 1 + len + ADDR_PORT_LEN;
                             break;
                         case ATYP_IPv6: // IPv6 address, 16 bytes
                             dstAddr = $"[{new IPAddress(_connetionRecvBuffer.Skip(1).Take(16).ToArray())}]";
                             dstPort = (_connetionRecvBuffer[17] << 8) + _connetionRecvBuffer[18];
 
-                            _addrBufLength = ADDR_ATYP_LEN + 16 + ADDR_PORT_LEN;
+                            AddrBufLength = ADDR_ATYP_LEN + 16 + ADDR_PORT_LEN;
                             break;
                     }
 
                     /* prepare address buffer for AEAD */
-                    Buffer.BlockCopy(_connetionRecvBuffer, 0, _addrBuf, 0, _addrBufLength);
+                    Buffer.BlockCopy(_connetionRecvBuffer, 0, _encryptor.AddrBufBytes, 0, AddrBufLength);
+                    _encryptor.AddrBufLength = AddrBufLength;
 
                     if (_config.isVerboseLogging)
                     {

@@ -1,4 +1,6 @@
-﻿namespace Fuckshadows.Encryption
+﻿using Fuckshadows.Controller;
+
+namespace Fuckshadows.Encryption
 {
     public class EncryptorInfo
     {
@@ -63,6 +65,14 @@
     {
         public const int MAX_INPUT_SIZE = 32768;
 
+        public const int MAX_DOMAIN_LEN = 255;
+        public const int ADDR_PORT_LEN = 2;
+        public const int ADDR_ATYP_LEN = 1;
+
+        public const int ATYP_IPv4 = 0x01;
+        public const int ATYP_DOMAIN = 0x03;
+        public const int ATYP_IPv6 = 0x04;
+
         protected EncryptorBase(string method, string password)
         {
             Method = method;
@@ -81,5 +91,9 @@
         public abstract void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength);
 
         public abstract void Dispose();
+
+        public int AddrBufLength { get; set; } = - 1;
+
+        public byte[] AddrBufBytes { get; set; } = new byte[ADDR_ATYP_LEN + 1 + MAX_DOMAIN_LEN + ADDR_PORT_LEN];
     }
 }
