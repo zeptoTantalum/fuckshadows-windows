@@ -15,7 +15,7 @@ namespace Fuckshadows.Encryption.Stream
         protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 4, false);
+        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
@@ -138,7 +138,8 @@ namespace Fuckshadows.Encryption.Stream
             if (! _decryptIVReceived) {
                 if (_circularBuffer.Size <= ivLen) {
                     // we need more data
-                    throw new CryptoNeedMoreException();
+                    outlength = 0;
+                    return;
                 }
                 // start decryption
                 _decryptIVReceived = true;

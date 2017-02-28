@@ -789,15 +789,16 @@ namespace Fuckshadows.Controller
                         {
                             _encryptor.Decrypt(_remoteRecvBuffer, bytesRead, _remoteSendBuffer, out bytesToSend);
                         }
-                        catch (CryptoNeedMoreException e)
-                        {
-                            // continue to recv
-                            throw new NotImplementedException();
-                        }
-                        catch (CryptoErrorException e)
+                        catch (CryptoErrorException)
                         {
                             Close();
                         }
+                    }
+                    if (bytesToSend == 0) {
+                        // need more to decrypt
+                        session.Remote.BeginReceive(_remoteRecvBuffer, 0, RecvSize, SocketFlags.None,
+                            PipeRemoteReceiveCallback, session);
+                        return;
                     }
                     _connection.BeginSend(_remoteSendBuffer, 0, bytesToSend, SocketFlags.None,
                         PipeConnectionSendCallback, session);

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using Fuckshadows.Encryption.Exception;
 
 namespace Fuckshadows.Encryption.Stream
 {
@@ -101,7 +102,7 @@ namespace Fuckshadows.Encryption.Stream
             }
             if (MbedTLS.cipher_update(isEncrypt ? _encryptCtx : _decryptCtx,
                 buf, length, outbuf, ref length) != 0 )
-                throw new System.Exception("Cannot update mbed TLS cipher context");
+                throw new CryptoErrorException();
         }
 
         #region IDisposable

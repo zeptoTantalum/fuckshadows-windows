@@ -1,16 +1,16 @@
 ﻿namespace Fuckshadows.Encryption.Exception
 {
-    public class CryptoNeedMoreException : System.Exception
+    internal class CryptoNeedMoreException : System.Exception
     {
-        public CryptoNeedMoreException()
+        internal CryptoNeedMoreException()
         {
         }
 
-        public CryptoNeedMoreException(string msg) : base(msg)
+        internal CryptoNeedMoreException(string msg) : base(msg)
         {
         }
 
-        public CryptoNeedMoreException(string message, System.Exception innerException) : base(message, innerException)
+        internal CryptoNeedMoreException(string message, System.Exception innerException) : base(message, innerException)
         {
         }
     }

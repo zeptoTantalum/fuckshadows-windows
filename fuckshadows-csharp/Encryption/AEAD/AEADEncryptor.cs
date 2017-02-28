@@ -22,7 +22,7 @@ namespace Fuckshadows.Encryption.AEAD
         protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 4, false);
+        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
 
         private const int CHUNK_LEN_BYTES = 2;
         private const int CHUNK_LEN_MASK = 0x3FFF;
@@ -146,7 +146,6 @@ namespace Fuckshadows.Encryption.AEAD
             // Generate salt
             randBytes(outbuf, saltLen);
             InitCipher(outbuf, true, true);
-            _encryptSaltSent = true;
             lock (tempbuf) {
                 //cipherEncrypt(true, length, buf, tempbuf);
                 outlength = length + tagLen + saltLen;
@@ -163,7 +162,8 @@ namespace Fuckshadows.Encryption.AEAD
                 // check if we get all of them
                 if (_circularBuffer.Size <= saltLen) {
                     // need more
-                    throw new CryptoNeedMoreException();
+                    outlength = 0;
+                    return;
                 }
                 _decryptSaltReceived = true;
                 byte[] salt = _circularBuffer.Get(saltLen);

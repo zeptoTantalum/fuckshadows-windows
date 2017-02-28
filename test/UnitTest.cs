@@ -158,14 +158,12 @@ namespace test
         }
 
         [TestCase]
-        public void TestMbedTLSEncryption()
+        public void TestStreamMbedTLSEncryption()
         {
-            // run it once before the multi-threading test to initialize global tables
-            RunSingleMbedTLSEncryptionThread();
             List<Thread> threads = new List<Thread>();
             for (int i = 0; i < 10; i++)
             {
-                Thread t = new Thread(RunSingleMbedTLSEncryptionThread);
+                Thread t = new Thread(RunSingleStreamMbedTLSEncryptionThread);
                 threads.Add(t);
                 t.Start();
             }
@@ -177,7 +175,7 @@ namespace test
             Assert.IsFalse(encryptionFailed);
         }
 
-        private void RunSingleMbedTLSEncryptionThread()
+        private void RunSingleStreamMbedTLSEncryptionThread()
         {
             try
             {
@@ -187,11 +185,42 @@ namespace test
                     IEncryptor decryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!");
                     RunStreamEncryptionRound(encryptor, decryptor);
                 }
-//                for (int i = 0; i < 100; i++) {
-//                    IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
-//                    IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
-//                    RunAEADEncryptionRound(encryptor, decryptor);
-//                }
+            }
+            catch
+            {
+                encryptionFailed = true;
+                throw;
+            }
+        }
+
+//        [TestCase]
+//        public void TestAEADMbedTLSEncryption()
+//        {
+//            List<Thread> threads = new List<Thread>();
+//            for (int i = 0; i < 10; i++)
+//            {
+//                Thread t = new Thread(RunSingleAEADMbedTLSEncryptionThread);
+//                threads.Add(t);
+//                t.Start();
+//            }
+//            foreach (Thread t in threads)
+//            {
+//                t.Join();
+//            }
+//            RNG.Close();
+//            Assert.IsFalse(encryptionFailed);
+//        }
+
+        private void RunSingleAEADMbedTLSEncryptionThread()
+        {
+            try
+            {
+
+                for (int i = 0; i < 100; i++) {
+                    IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+                    IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+                    RunAEADEncryptionRound(encryptor, decryptor);
+                }
             }
             catch
             {
@@ -239,14 +268,12 @@ namespace test
         }
 
         [TestCase]
-        public void TestSodiumEncryption()
+        public void TestStreamSodiumEncryption()
         {
-            // run it once before the multi-threading test to initialize global tables
-            RunSingleSodiumEncryptionThread();
             List<Thread> threads = new List<Thread>();
             for (int i = 0; i < 10; i++)
             {
-                Thread t = new Thread(RunSingleSodiumEncryptionThread);
+                Thread t = new Thread(RunSingleStreamSodiumEncryptionThread);
                 threads.Add(t);
                 t.Start();
             }
@@ -258,7 +285,7 @@ namespace test
             Assert.IsFalse(encryptionFailed);
         }
 
-        private void RunSingleSodiumEncryptionThread()
+        private void RunSingleStreamSodiumEncryptionThread()
         {
             try
             {
@@ -268,12 +295,43 @@ namespace test
                     IEncryptor decryptor = new StreamSodiumEncryptor("salsa20", "barfoo!");
                     RunStreamEncryptionRound(encryptor, decryptor);
                 }
-//                for (int i = 0; i < 100; i++)
-//                {
-//                    IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
-//                    IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
-//                    RunAEADEncryptionRound(encryptor, decryptor);
-//                }
+            }
+            catch
+            {
+                encryptionFailed = true;
+                throw;
+            }
+        }
+
+//        [TestCase]
+//        public void TestAEADSodiumEncryption()
+//        {
+//            List<Thread> threads = new List<Thread>();
+//            for (int i = 0; i < 10; i++)
+//            {
+//                Thread t = new Thread(RunSingleAEADSodiumEncryptionThread);
+//                threads.Add(t);
+//                t.Start();
+//            }
+//            foreach (Thread t in threads)
+//            {
+//                t.Join();
+//            }
+//            RNG.Close();
+//            Assert.IsFalse(encryptionFailed);
+//        }
+
+        private void RunSingleAEADSodiumEncryptionThread()
+        {
+            try
+            {
+
+                for (int i = 0; i < 100; i++)
+                {
+                    IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
+                    IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
+                    RunAEADEncryptionRound(encryptor, decryptor);
+                }
             }
             catch
             {

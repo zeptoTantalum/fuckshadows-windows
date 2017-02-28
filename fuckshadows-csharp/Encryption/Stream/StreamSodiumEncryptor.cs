@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Fuckshadows.Encryption.Exception;
 
 namespace Fuckshadows.Encryption.Stream
 {
@@ -49,6 +50,7 @@ namespace Fuckshadows.Encryption.Stream
             ulong ic;
             byte[] sodiumBuf;
             byte[] iv;
+            int ret = -1;
 
             if (isEncrypt)
             {
@@ -70,15 +72,17 @@ namespace Fuckshadows.Encryption.Stream
             switch (_cipher)
             {
                 case CIPHER_SALSA20:
-                    Sodium.crypto_stream_salsa20_xor_ic(sodiumBuf, sodiumBuf, (ulong)(padding + length), iv, ic, _key);
+                    ret = Sodium.crypto_stream_salsa20_xor_ic(sodiumBuf, sodiumBuf, (ulong)(padding + length), iv, ic, _key);
                     break;
                 case CIPHER_CHACHA20:
-                    Sodium.crypto_stream_chacha20_xor_ic(sodiumBuf, sodiumBuf, (ulong)(padding + length), iv, ic, _key);
+                    ret = Sodium.crypto_stream_chacha20_xor_ic(sodiumBuf, sodiumBuf, (ulong)(padding + length), iv, ic, _key);
                     break;
                 case CIPHER_CHACHA20_IETF:
-                    Sodium.crypto_stream_chacha20_ietf_xor_ic(sodiumBuf, sodiumBuf, (ulong)(padding + length), iv, (uint)ic, _key);
+                    ret = Sodium.crypto_stream_chacha20_ietf_xor_ic(sodiumBuf, sodiumBuf, (ulong)(padding + length), iv, (uint)ic, _key);
                     break;
             }
+            if (ret != 0) throw new CryptoErrorException();
+
             Buffer.BlockCopy(sodiumBuf, padding, outbuf, 0, length);
             padding += length;
             ic += (ulong)padding / SODIUM_BLOCK_SIZE;
