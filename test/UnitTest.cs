@@ -379,5 +379,29 @@ namespace test
             string skey2str = Convert.ToBase64String(skey2);
             Assert.IsTrue(skey1str == skey2str);
         }
+
+        [TestCase]
+        public void TestAEADChunk()
+        {
+            string pass = "test-aead-derive-session-key";
+            byte[] saltBytes = { 0x8c, 0xfe, 0x67, 0x9a, 0x4c, 0x05, 0xfe, 0x36, 0xca, 0x00, 0x9c, 0x90, 0xe9, 0x66, 0x5b, 0x48, 0x35, 0x1c, 0x07, 0x55, 0x18, 0x94, 0x32, 0x72, 0xc8, 0x40, 0xd2, 0xfd, 0x1f, 0xd4, 0xf1, 0x22 };
+            AEADEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", pass);
+            AEADEncryptor decryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", pass);
+            byte[] plain = new byte[100];
+            byte[] cipher = new byte[200];
+            byte[] plain2 = new byte[100];
+            int cipherLen;
+            int plain2Len;
+            _random.NextBytes(plain);
+            encryptor.InitCipher(saltBytes, true, false);
+            encryptor.ChunkEncrypt(plain, 100, cipher, out cipherLen);
+            decryptor.InitCipher(saltBytes, false, false);
+            decryptor.ChunkDecrypt(cipher, cipherLen, plain2, out plain2Len);
+            Assert.IsTrue(plain2Len == 100);
+            for (int i = 0; i < 100; i++)
+            {
+                Assert.AreEqual(plain[i], plain2[i]);
+            }
+        }
     }
 }

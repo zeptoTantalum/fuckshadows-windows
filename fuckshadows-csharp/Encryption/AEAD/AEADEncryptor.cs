@@ -86,10 +86,13 @@ namespace Fuckshadows.Encryption.AEAD
         protected void InitKey(string password)
         {
             byte[] passbuf = Encoding.UTF8.GetBytes(password);
+            // init master key
             if (_Masterkey == null) _Masterkey = new byte[keyLen];
             if (_Masterkey.Length < keyLen) Array.Resize(ref _Masterkey, keyLen);
             DeriveKey(passbuf, _Masterkey);
-
+            // init session key
+            if (_sessionKey == null) _sessionKey = new byte[keyLen];
+            if (_sessionKey.Length < keyLen) Array.Resize(ref _sessionKey, keyLen);
         }
 
         public void DeriveKey(byte[] password, byte[] key)
@@ -110,7 +113,7 @@ namespace Fuckshadows.Encryption.AEAD
                 Sodium.sodium_increment(_nonce, nonceLen);
         }
 
-        protected virtual void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
+        public virtual void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
         {
             if (isEncrypt) {
                 _encryptSalt = new byte[saltLen];
@@ -207,7 +210,7 @@ namespace Fuckshadows.Encryption.AEAD
 
         #region Private handling
 
-        protected void ChunkEncrypt(byte[] plaintext, int plainLen, byte[] ciphertext, out int cipherLen)
+        public void ChunkEncrypt(byte[] plaintext, int plainLen, byte[] ciphertext, out int cipherLen)
         {
             int chunkLen = plainLen & CHUNK_LEN_MASK;
             byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
@@ -232,7 +235,7 @@ namespace Fuckshadows.Encryption.AEAD
             cipherLen = encChunkLenLength + encBufLength;
         }
 
-        protected void ChunkDecrypt(byte[] ciphertext, int cipherLen, byte[] plaintext, out int plainLen)
+        public void ChunkDecrypt(byte[] ciphertext, int cipherLen, byte[] plaintext, out int plainLen)
         {
             // split buffer
             byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];

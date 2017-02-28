@@ -30,7 +30,7 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected override Dictionary<string, EncryptorInfo> getCiphers() { return _ciphers; }
 
-        protected override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
+        public override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
         {
             base.InitCipher(salt, isEncrypt, isUdp);
             if (isUdp) {
@@ -48,20 +48,19 @@ namespace Fuckshadows.Encryption.AEAD
         {
             // buf: all plaintext
             // outbuf: ciphertext + tag
-            byte[] tagbuf = new byte[tagLen];
             int ret;
-            int encClen = 0;
+            ulong encClen = 0;
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_encrypt(ciphertext, ref encClen,
-                                                                      plaintext, plen,
+                                                                      plaintext, (ulong)plen,
                                                                       IntPtr.Zero, 0,
                                                                       IntPtr.Zero, _nonce,
                                                                       _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_encrypt(ciphertext, ref encClen,
-                                                                           plaintext, plen,
+                                                                           plaintext, (ulong)plen,
                                                                            IntPtr.Zero, 0,
                                                                            IntPtr.Zero, _nonce,
                                                                            _sodiumKey);
@@ -71,9 +70,7 @@ namespace Fuckshadows.Encryption.AEAD
                     throw new System.Exception("not implemented");
             }
             if (ret != 0) throw new CryptoErrorException();
-            // TODO: not sure
-            // Debug.Assert(encClen == plen + tagLen);
-            Buffer.BlockCopy(tagbuf, 0, ciphertext, plen, tagLen);
+            Debug.Assert((int)encClen == plen + tagLen);
             clen = plen + tagLen;
             return ret;
         }

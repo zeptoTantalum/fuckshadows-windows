@@ -31,7 +31,7 @@ namespace Fuckshadows.Encryption.AEAD
 
         protected override Dictionary<string, EncryptorInfo> getCiphers() { return _ciphers; }
 
-        protected override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
+        public override void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
         {
             base.InitCipher(salt, isEncrypt, isUdp);
             IntPtr ctx = Marshal.AllocHGlobal(MbedTLS.cipher_get_size_ex());
