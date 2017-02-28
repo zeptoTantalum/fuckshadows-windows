@@ -19,10 +19,12 @@ namespace Fuckshadows.Encryption.AEAD
         private const string Personal = "fuckshadows-g3nk";
         private static readonly byte[] PersonalBytes = Encoding.ASCII.GetBytes(Personal);
 
-        protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
+        // for UDP only
+        protected static byte[] _udpTmpBuf = new byte[4096];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
+        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
+        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
 
         private const int CHUNK_LEN_BYTES = 2;
         private const int CHUNK_LEN_MASK = 0x3FFF;
@@ -130,15 +132,35 @@ namespace Fuckshadows.Encryption.AEAD
                 randBytes(outbuf, saltLen);
                 InitCipher(outbuf, true, false);
                 _encryptSaltSent = true;
-                lock (tempbuf) {
+
                     //cipherEncrypt(false, length, buf, tempbuf);
                     outlength = length + tagLen * 2 + saltLen + CHUNK_LEN_BYTES;
-                    Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
-                }
+                    //Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
+
             } else {
                 outlength = length + tagLen * 2 + CHUNK_LEN_BYTES;
                 //cipherEncrypt(false, length, buf, outbuf);
             }
+        }
+
+        public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
+        {
+            Debug.Assert(_decCircularBuffer != null, "_decCircularBuffer != null");
+            // drop all into buffer
+            _decCircularBuffer.Put(buf, 0, length);
+            if (! _decryptSaltReceived) {
+                // check if we get all of them
+                if (_decCircularBuffer.Size <= saltLen) {
+                    // need more
+                    outlength = 0;
+                    return;
+                }
+                _decryptSaltReceived = true;
+                byte[] salt = _decCircularBuffer.Get(saltLen);
+                InitCipher(salt, false, false);
+            }
+            // handle chunks
+            throw new NotImplementedException();
         }
 
         public override void EncryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
@@ -146,31 +168,11 @@ namespace Fuckshadows.Encryption.AEAD
             // Generate salt
             randBytes(outbuf, saltLen);
             InitCipher(outbuf, true, true);
-            lock (tempbuf) {
+            lock (_udpTmpBuf) {
                 //cipherEncrypt(true, length, buf, tempbuf);
                 outlength = length + tagLen + saltLen;
-                Buffer.BlockCopy(tempbuf, 0, outbuf, saltLen, length);
+                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, saltLen, length);
             }
-        }
-
-        public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
-        {
-            Debug.Assert(_circularBuffer != null, "_circularBuffer != null");
-            // drop all into buffer
-            _circularBuffer.Put(buf, 0, length);
-            if (! _decryptSaltReceived) {
-                // check if we get all of them
-                if (_circularBuffer.Size <= saltLen) {
-                    // need more
-                    outlength = 0;
-                    return;
-                }
-                _decryptSaltReceived = true;
-                byte[] salt = _circularBuffer.Get(saltLen);
-                InitCipher(salt, false, false);
-            }
-            // handle chunks
-            throw new NotImplementedException();
         }
 
         public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength) { throw new NotImplementedException(); }

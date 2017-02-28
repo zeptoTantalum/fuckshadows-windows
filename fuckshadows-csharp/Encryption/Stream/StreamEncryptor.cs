@@ -12,10 +12,12 @@ namespace Fuckshadows.Encryption.Stream
     public abstract class StreamEncryptor
         : EncryptorBase
     {
-        protected static byte[] tempbuf = new byte[MAX_INPUT_SIZE];
+        // for UDP only
+        protected static byte[] _udpTmpBuf = new byte[4096];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _circularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
+        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
+        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
 
         protected Dictionary<string, EncryptorInfo> ciphers;
 
@@ -101,56 +103,67 @@ namespace Fuckshadows.Encryption.Stream
 
         protected static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
 
+        #region TCP
+
         public override void Encrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
+            int cipherOffset = 0;
+            Debug.Assert(_encCircularBuffer != null, "_encCircularBuffer != null");
+            _encCircularBuffer.Put(buf, 0, length);
             if (! _encryptIVSent) {
                 // Generate IV
-                randBytes(outbuf, ivLen);
-                initCipher(outbuf, true);
+                byte[] ivBytes = new byte[ivLen];
+                randBytes(ivBytes, ivLen);
+                initCipher(ivBytes, true);
+                
+                Buffer.BlockCopy(ivBytes, 0, outbuf, 0, ivLen);
+                cipherOffset = ivLen;
                 _encryptIVSent = true;
-                lock (tempbuf) {
-                    cipherUpdate(true, length, buf, tempbuf);
-                    outlength = length + ivLen;
-                    Buffer.BlockCopy(tempbuf, 0, outbuf, ivLen, length);
-                }
-            } else {
-                outlength = length;
-                cipherUpdate(true, length, buf, outbuf);
             }
-        }
-
-        public override void EncryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
-        {
-            // Generate IV
-            randBytes(outbuf, ivLen);
-            initCipher(outbuf, true);
-            lock (tempbuf) {
-                cipherUpdate(true, length, buf, tempbuf);
-                outlength = length + ivLen;
-                Buffer.BlockCopy(tempbuf, 0, outbuf, ivLen, length);
-            }
+            int size = _encCircularBuffer.Size;
+            byte[] plain = _encCircularBuffer.Get(size);
+            byte[] cipher = new byte[size];
+            cipherUpdate(true, size, plain, cipher);
+            Buffer.BlockCopy(cipher, 0, outbuf, cipherOffset, size);
+            outlength = size + cipherOffset;
         }
 
         public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
-            Debug.Assert(_circularBuffer != null, "_circularBuffer != null");
-            _circularBuffer.Put(buf, 0, length);
+            Debug.Assert(_decCircularBuffer != null, "_circularBuffer != null");
+            _decCircularBuffer.Put(buf, 0, length);
             if (! _decryptIVReceived) {
-                if (_circularBuffer.Size <= ivLen) {
+                if (_decCircularBuffer.Size <= ivLen) {
                     // we need more data
                     outlength = 0;
                     return;
                 }
                 // start decryption
                 _decryptIVReceived = true;
-                byte[] iv = _circularBuffer.Get(ivLen);
+                byte[] iv = _decCircularBuffer.Get(ivLen);
                 initCipher(iv, false);
             }
-            byte[] cipher = _circularBuffer.Get(_circularBuffer.Size);
+            byte[] cipher = _decCircularBuffer.Get(_decCircularBuffer.Size);
 
             cipherUpdate(false, cipher.Length, cipher, outbuf);
             outlength = cipher.Length;
             // done the decryption
+        }
+
+        #endregion
+
+        #region UDP
+
+        public override void EncryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
+        {
+            // Generate IV
+            randBytes(outbuf, ivLen);
+            initCipher(outbuf, true);
+            lock (_udpTmpBuf) {
+                cipherUpdate(true, length, buf, _udpTmpBuf);
+                outlength = length + ivLen;
+                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, ivLen, length);
+            }
         }
 
         public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
@@ -158,11 +171,13 @@ namespace Fuckshadows.Encryption.Stream
             // Get IV from first pos
             initCipher(buf, false);
             outlength = length - ivLen;
-            lock (tempbuf) {
+            lock (_udpTmpBuf) {
                 // C# could be multi-threaded
-                Buffer.BlockCopy(buf, ivLen, tempbuf, 0, length - ivLen);
-                cipherUpdate(false, length - ivLen, tempbuf, outbuf);
+                Buffer.BlockCopy(buf, ivLen, _udpTmpBuf, 0, length - ivLen);
+                cipherUpdate(false, length - ivLen, _udpTmpBuf, outbuf);
             }
         }
+
+        #endregion
     }
 }

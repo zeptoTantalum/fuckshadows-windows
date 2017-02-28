@@ -74,9 +74,9 @@ namespace Fuckshadows.Controller
         {
             if (header == null && tailer == null)
                 Debug($"{local} => {remote} (size={len})");
-            else if (header == null && tailer != null)
+            else if (header == null)
                 Debug($"{local} => {remote} (size={len}), {tailer}");
-            else if (header != null && tailer == null)
+            else if (tailer == null)
                 Debug($"{header}: {local} => {remote} (size={len})");
             else
                 Debug($"{header}: {local} => {remote} (size={len}), {tailer}");
@@ -149,7 +149,7 @@ namespace Fuckshadows.Controller
 
         private string GetTimestamp()
         {
-            return "[" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "] ";
+            return $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ";
         }
 
         public override void WriteLine(string value)

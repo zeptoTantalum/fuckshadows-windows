@@ -158,7 +158,8 @@ namespace Fuckshadows.Controller
 
         private const int CMD_CONNECT = 0x01;
         private const int CMD_UDP_ASSOC = 0x03;
-
+        
+        /* for AEAD first request chunk */
         private byte[] _addrBuf = new byte[ADDR_ATYP_LEN + MAX_DOMAIN_LEN + ADDR_PORT_LEN];
         private int _addrBufLength;
 
@@ -430,26 +431,26 @@ namespace Fuckshadows.Controller
 
                     int atyp = _connetionRecvBuffer[0];
 
-                    string dst_addr = "Unknown";
-                    int dst_port = -1;
+                    string dstAddr = "Unknown";
+                    int dstPort = -1;
                     switch (atyp)
                     {
                         case ATYP_IPv4: // IPv4 address, 4 bytes
-                            dst_addr = new IPAddress(_connetionRecvBuffer.Skip(1).Take(4).ToArray()).ToString();
-                            dst_port = (_connetionRecvBuffer[5] << 8) + _connetionRecvBuffer[6];
+                            dstAddr = new IPAddress(_connetionRecvBuffer.Skip(1).Take(4).ToArray()).ToString();
+                            dstPort = (_connetionRecvBuffer[5] << 8) + _connetionRecvBuffer[6];
 
                             _addrBufLength = ADDR_ATYP_LEN + 4 + ADDR_PORT_LEN;
                             break;
                         case ATYP_DOMAIN: // domain name, length + str
                             int len = _connetionRecvBuffer[1];
-                            dst_addr = System.Text.Encoding.UTF8.GetString(_connetionRecvBuffer, 2, len);
-                            dst_port = (_connetionRecvBuffer[len + 2] << 8) + _connetionRecvBuffer[len + 3];
+                            dstAddr = System.Text.Encoding.UTF8.GetString(_connetionRecvBuffer, 2, len);
+                            dstPort = (_connetionRecvBuffer[len + 2] << 8) + _connetionRecvBuffer[len + 3];
 
                             _addrBufLength = ADDR_ATYP_LEN + 1 + len + ADDR_PORT_LEN;
                             break;
                         case ATYP_IPv6: // IPv6 address, 16 bytes
-                            dst_addr = $"[{new IPAddress(_connetionRecvBuffer.Skip(1).Take(16).ToArray())}]";
-                            dst_port = (_connetionRecvBuffer[17] << 8) + _connetionRecvBuffer[18];
+                            dstAddr = $"[{new IPAddress(_connetionRecvBuffer.Skip(1).Take(16).ToArray())}]";
+                            dstPort = (_connetionRecvBuffer[17] << 8) + _connetionRecvBuffer[18];
 
                             _addrBufLength = ADDR_ATYP_LEN + 16 + ADDR_PORT_LEN;
                             break;
@@ -460,10 +461,10 @@ namespace Fuckshadows.Controller
 
                     if (_config.isVerboseLogging)
                     {
-                        Logging.Info($"connect to {dst_addr}:{dst_port}");
+                        Logging.Info($"connect to {dstAddr}:{dstPort}");
                     }
 
-                    _destEndPoint = SocketUtil.GetEndPoint(dst_addr, dst_port);
+                    _destEndPoint = SocketUtil.GetEndPoint(dstAddr, dstPort);
 
                     onSuccess.Invoke(); /* StartConnect() */
                 }
