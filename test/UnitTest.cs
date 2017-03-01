@@ -441,9 +441,9 @@ namespace test
             int cipherLen;
             int plain2Len;
             _random.NextBytes(plain);
-            encryptor.InitCipher(saltBytes, true, false);
+            encryptor.InitCipher(saltBytes, true, true);
             encryptor.EncryptUDP(plain, 4096, cipher, out cipherLen);
-            decryptor.InitCipher(saltBytes, false, false);
+            decryptor.InitCipher(saltBytes, false, true);
             decryptor.DecryptUDP(cipher, cipherLen, plain2, out plain2Len);
             Assert.IsTrue(plain2Len == 4096);
             for (int i = 0; i < 4096; i++)
