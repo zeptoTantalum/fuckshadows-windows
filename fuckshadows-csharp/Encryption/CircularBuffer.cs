@@ -489,12 +489,6 @@ namespace Cyotek.Collections.Generic
       {
         this.Head -= this.Capacity;
       }
-
-      /*
-       * Modified by wongsyrone
-       * We should also reduce the circular buffer size
-       */
-      this.Size -= count;
     }
 
     /// <summary>

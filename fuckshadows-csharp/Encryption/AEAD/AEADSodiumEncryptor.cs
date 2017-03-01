@@ -55,14 +55,14 @@ namespace Fuckshadows.Encryption.AEAD
                     ret = Sodium.crypto_aead_chacha20poly1305_encrypt(ciphertext, ref encClen,
                                                                       plaintext, (ulong)plen,
                                                                       IntPtr.Zero, 0,
-                                                                      IntPtr.Zero, _nonce,
+                                                                      IntPtr.Zero, _encNonce,
                                                                       _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_encrypt(ciphertext, ref encClen,
                                                                            plaintext, (ulong)plen,
                                                                            IntPtr.Zero, 0,
-                                                                           IntPtr.Zero, _nonce,
+                                                                           IntPtr.Zero, _encNonce,
                                                                            _sodiumKey);
 
                     break;
@@ -81,24 +81,20 @@ namespace Fuckshadows.Encryption.AEAD
             // outbuf: plaintext
             int ret;
             ulong decPlen = 0;
-            // split tag
-            byte[] tagbuf = new byte[tagLen];
-            Buffer.BlockCopy(ciphertext, clen - tagLen, tagbuf, 0, tagLen);
-
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_decrypt(plaintext, ref decPlen,
                                                                       IntPtr.Zero,
                                                                       ciphertext, (ulong)clen,
                                                                       IntPtr.Zero, 0,
-                                                                      _nonce, _sodiumKey);
+                                                                      _decNonce, _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_decrypt(plaintext, ref decPlen,
                                                                            IntPtr.Zero,
                                                                            ciphertext, (ulong)clen,
                                                                            IntPtr.Zero, 0,
-                                                                           _nonce, _sodiumKey);
+                                                                           _decNonce, _sodiumKey);
                     break;
                 default:
                     throw new System.Exception("not implemented");

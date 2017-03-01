@@ -75,7 +75,7 @@ namespace Fuckshadows.Encryption.AEAD
                 case CIPHER_AES:
                     ret = MbedTLS.cipher_auth_encrypt(_encryptCtx,
                                                       /* nonce */
-                                                      _nonce, nonceLen,
+                                                      _encNonce, nonceLen,
                                                       /* AD */
                                                       IntPtr.Zero, 0,
                                                       /* plain */
@@ -106,7 +106,7 @@ namespace Fuckshadows.Encryption.AEAD
             switch (_cipher) {
                 case CIPHER_AES:
                     ret = MbedTLS.cipher_auth_decrypt(_decryptCtx,
-                                                      _nonce, nonceLen,
+                                                      _decNonce, nonceLen,
                                                       IntPtr.Zero, 0,
                                                       ciphertext, clen - tagLen,
                                                       plaintext, ref olen,

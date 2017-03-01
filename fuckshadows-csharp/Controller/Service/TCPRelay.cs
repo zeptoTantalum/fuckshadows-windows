@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -158,8 +159,8 @@ namespace Fuckshadows.Controller
         private int _totalRead = 0;
         private int _totalWrite = 0;
 
-        private byte[] _remoteRecvBuffer = new byte[BufferSize];
-        private byte[] _remoteSendBuffer = new byte[BufferSize];
+        private byte[] _remoteRecvBuffer = new byte[MAX_INPUT_SIZE * 2];
+        private byte[] _remoteSendBuffer = new byte[MAX_INPUT_SIZE * 2];
         private byte[] _connetionRecvBuffer = new byte[BufferSize];
         private byte[] _connetionSendBuffer = new byte[BufferSize];
 
@@ -811,16 +812,19 @@ namespace Fuckshadows.Controller
                         }
                         catch (CryptoErrorException)
                         {
+                            Logging.Debug("decryption error");
                             Close();
                             return;
                         }
                     }
                     if (bytesToSend == 0) {
                         // need more to decrypt
+                        Logging.Debug("Need more to decrypt");
                         session.Remote.BeginReceive(_remoteRecvBuffer, 0, RecvSize, SocketFlags.None,
                             PipeRemoteReceiveCallback, session);
                         return;
                     }
+                    Logging.Debug($"start sending {bytesToSend}");
                     _connection.BeginSend(_remoteSendBuffer, 0, bytesToSend, SocketFlags.None,
                         PipeConnectionSendCallback, session);
                     IStrategy strategy = _controller.GetCurrentStrategy();
@@ -872,9 +876,18 @@ namespace Fuckshadows.Controller
         {
             _totalWrite += length;
             int bytesToSend;
-            lock (_encryptionLock)
+            try
             {
-                _encryptor.Encrypt(_connetionRecvBuffer, length, _connetionSendBuffer, out bytesToSend);
+                lock (_encryptionLock)
+                {
+                    _encryptor.Encrypt(_connetionRecvBuffer, length, _connetionSendBuffer, out bytesToSend);
+                }
+            }
+            catch (CryptoErrorException)
+            {
+                Logging.Debug("encryption error");
+                Close();
+                return;
             }
             _tcprelay.UpdateOutboundCounter(_server, bytesToSend);
             _startSendingTime = DateTime.Now;

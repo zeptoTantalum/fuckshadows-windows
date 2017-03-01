@@ -53,8 +53,9 @@ namespace test
         private void RunAEADEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
         {
             RNG.Reload();
-            byte[] plain = new byte[16384];
-            const int Salt = 16;
+            byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
+            byte[] plain = new byte[16384 * 2];
+            const int Salt = 32;
             // make the cipher array large enough to hold chunks
             byte[] cipher = new byte[plain.Length * 4 + Salt];
             byte[] plain2 = new byte[plain.Length + Salt];
@@ -62,6 +63,7 @@ namespace test
             int outLen2 = 0;
 
             _random.NextBytes(plain);
+            Buffer.BlockCopy(abufBytes, 0, plain, 0, abufBytes.Length);
             encryptor.Encrypt(plain, plain.Length, cipher, out outLen);
             decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
             Assert.AreEqual(plain.Length, outLen2);
@@ -85,8 +87,8 @@ namespace test
             }
         }
 
-        private static bool encryptionFailed = false;
         private Random _random = new Random();
+        private static bool encryptionFailed = false;
 
         [TestCase]
         public void TestCompareVersion()
@@ -160,6 +162,7 @@ namespace test
         [TestCase]
         public void TestStreamMbedTLSEncryption()
         {
+            bool encryptionFailed = false;
             List<Thread> threads = new List<Thread>();
             for (int i = 0; i < 10; i++)
             {
@@ -193,32 +196,37 @@ namespace test
             }
         }
 
-//        [TestCase]
-//        public void TestAEADMbedTLSEncryption()
-//        {
-//            List<Thread> threads = new List<Thread>();
-//            for (int i = 0; i < 10; i++)
-//            {
-//                Thread t = new Thread(RunSingleAEADMbedTLSEncryptionThread);
-//                threads.Add(t);
-//                t.Start();
-//            }
-//            foreach (Thread t in threads)
-//            {
-//                t.Join();
-//            }
-//            RNG.Close();
-//            Assert.IsFalse(encryptionFailed);
-//        }
+        [TestCase]
+        public void TestAEADMbedTLSEncryption()
+        {
+            bool encryptionFailed = false;
+            List<Thread> threads = new List<Thread>();
+            for (int i = 0; i < 10; i++)
+            {
+                Thread t = new Thread(RunSingleAEADMbedTLSEncryptionThread);
+                threads.Add(t);
+                t.Start();
+            }
+            foreach (Thread t in threads)
+            {
+                t.Join();
+            }
+            RNG.Close();
+            Assert.IsFalse(encryptionFailed);
+        }
 
-        private void RunSingleAEADMbedTLSEncryptionThread()
+        private void RunSingleAEADMbedTLSEncryptionThread(object o)
         {
             try
             {
-
-                for (int i = 0; i < 100; i++) {
+                byte[] abufBytes = { 3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187 };
+                int abufLen = abufBytes.Length;
+                for (int i = 0; i < 100; i++)
+                {
                     IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
                     IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
+                    Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
+                    encryptor.AddrBufLength = abufLen;
                     RunAEADEncryptionRound(encryptor, decryptor);
                 }
             }
@@ -303,33 +311,36 @@ namespace test
             }
         }
 
-//        [TestCase]
-//        public void TestAEADSodiumEncryption()
-//        {
-//            List<Thread> threads = new List<Thread>();
-//            for (int i = 0; i < 10; i++)
-//            {
-//                Thread t = new Thread(RunSingleAEADSodiumEncryptionThread);
-//                threads.Add(t);
-//                t.Start();
-//            }
-//            foreach (Thread t in threads)
-//            {
-//                t.Join();
-//            }
-//            RNG.Close();
-//            Assert.IsFalse(encryptionFailed);
-//        }
+        [TestCase]
+        public void TestAEADSodiumEncryption()
+        {
+            List<Thread> threads = new List<Thread>();
+            for (int i = 0; i < 10; i++)
+            {
+                Thread t = new Thread(RunSingleAEADSodiumEncryptionThread);
+                threads.Add(t);
+                t.Start();
+            }
+            foreach (Thread t in threads)
+            {
+                t.Join();
+            }
+            RNG.Close();
+            Assert.IsFalse(encryptionFailed);
+        }
 
-        private void RunSingleAEADSodiumEncryptionThread()
+        public void RunSingleAEADSodiumEncryptionThread()
         {
             try
             {
-
+                byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
+                int abufLen = abufBytes.Length;
                 for (int i = 0; i < 100; i++)
                 {
                     IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
                     IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", "barfoo!");
+                    Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
+                    encryptor.AddrBufLength = abufLen;
                     RunAEADEncryptionRound(encryptor, decryptor);
                 }
             }
@@ -341,12 +352,17 @@ namespace test
         }
 
         [TestCase]
-        public void TestLegacyDeriveKey() {
+        public void TestLegacyDeriveKey()
+        {
             string pass = "test-legacy";
             byte[] passBytes = Encoding.UTF8.GetBytes(pass);
             byte[] key1 = new byte[32];
             StreamEncryptor.LegacyDeriveKey(passBytes, key1);
-            byte[] key2 = { 0x7b, 0x14, 0xff, 0x93, 0xd6, 0x63, 0x27, 0xfa, 0xd4, 0xdc, 0x37, 0x86, 0x46, 0x86, 0x3f, 0xc4, 0x53, 0x04, 0xd0, 0xdb, 0xf3, 0x79, 0xbd, 0xb5, 0x54, 0x44, 0xf9, 0x91, 0x80, 0x50, 0x7e, 0xa2 };
+            byte[] key2 =
+            {
+                0x7b, 0x14, 0xff, 0x93, 0xd6, 0x63, 0x27, 0xfa, 0xd4, 0xdc, 0x37, 0x86, 0x46, 0x86, 0x3f,
+                0xc4, 0x53, 0x04, 0xd0, 0xdb, 0xf3, 0x79, 0xbd, 0xb5, 0x54, 0x44, 0xf9, 0x91, 0x80, 0x50, 0x7e, 0xa2
+            };
             string key1str = Convert.ToBase64String(key1);
             string key2str = Convert.ToBase64String(key2);
             Assert.IsTrue(key1str == key2str);
@@ -360,19 +376,37 @@ namespace test
             byte[] key1 = new byte[32];
             AEADSodiumEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", pass);
             encryptor.DeriveKey(passBytes, key1);
-            byte[] key2 = { 0xb5, 0x02, 0xe1, 0x43, 0x31, 0x6e, 0xea, 0xad, 0x3d, 0x9d, 0xd2, 0x9f, 0x1c, 0xdc, 0x1a, 0xe9, 0xbd, 0x48, 0x2c, 0xda, 0xa8, 0x21, 0x99, 0x3b, 0x85, 0x45, 0x22, 0x34, 0x9a, 0x91, 0x33, 0xfd };
+            byte[] key2 =
+            {
+                0xb5, 0x02, 0xe1, 0x43, 0x31, 0x6e, 0xea, 0xad, 0x3d, 0x9d, 0xd2, 0x9f, 0x1c, 0xdc, 0x1a,
+                0xe9, 0xbd, 0x48, 0x2c, 0xda, 0xa8, 0x21, 0x99, 0x3b, 0x85, 0x45, 0x22, 0x34, 0x9a, 0x91, 0x33, 0xfd
+            };
             string key1str = Convert.ToBase64String(key1);
             string key2str = Convert.ToBase64String(key2);
             Assert.IsTrue(key1str == key2str);
         }
 
         [TestCase]
-        public void TestDeriveSessionKey() {
+        public void TestDeriveSessionKey()
+        {
             string pass = "test-aead-derive-session-key";
             byte[] skey1 = new byte[32];
-            byte[] saltBytes = { 0x8c, 0xfe, 0x67, 0x9a, 0x4c, 0x05, 0xfe, 0x36, 0xca, 0x00, 0x9c, 0x90, 0xe9, 0x66, 0x5b, 0x48, 0x35, 0x1c, 0x07, 0x55, 0x18, 0x94, 0x32, 0x72, 0xc8, 0x40, 0xd2, 0xfd, 0x1f, 0xd4, 0xf1, 0x22 };
-            byte[] masterKeyBytes = { 0x4d, 0x79, 0xd4, 0x6e, 0x63, 0x7d, 0xb5, 0x0d, 0xd1, 0x7b, 0x24, 0xe3, 0xb8, 0xdf, 0xf3, 0xb5, 0xde, 0xba, 0x42, 0xaf, 0x3a, 0x2e, 0x94, 0xbf, 0xb2, 0xf4, 0x37, 0x91, 0xae, 0xd4, 0x65, 0x04 };
-            byte[] skey2 = { 0x60, 0xc7, 0xa8, 0xe5, 0x59, 0x6b, 0x7a, 0xcd, 0x65, 0xd8, 0xe5, 0x54, 0x31, 0x57, 0x89, 0xf2, 0x39, 0xa7, 0xf8, 0x96, 0x37, 0x88, 0x90, 0x9e, 0xc1, 0xe1, 0xc2, 0xb7, 0xf0, 0x9f, 0x6f, 0xd9 };
+            byte[] saltBytes =
+            {
+                0x8c, 0xfe, 0x67, 0x9a, 0x4c, 0x05, 0xfe, 0x36, 0xca, 0x00, 0x9c, 0x90, 0xe9, 0x66, 0x5b,
+                0x48, 0x35, 0x1c, 0x07, 0x55, 0x18, 0x94, 0x32, 0x72, 0xc8, 0x40, 0xd2, 0xfd, 0x1f, 0xd4, 0xf1, 0x22
+            };
+            byte[] masterKeyBytes =
+            {
+                0x4d, 0x79, 0xd4, 0x6e, 0x63, 0x7d, 0xb5, 0x0d, 0xd1, 0x7b, 0x24, 0xe3, 0xb8, 0xdf,
+                0xf3, 0xb5, 0xde, 0xba, 0x42, 0xaf, 0x3a, 0x2e, 0x94, 0xbf, 0xb2, 0xf4, 0x37, 0x91, 0xae, 0xd4, 0x65,
+                0x04
+            };
+            byte[] skey2 =
+            {
+                0x60, 0xc7, 0xa8, 0xe5, 0x59, 0x6b, 0x7a, 0xcd, 0x65, 0xd8, 0xe5, 0x54, 0x31, 0x57, 0x89,
+                0xf2, 0x39, 0xa7, 0xf8, 0x96, 0x37, 0x88, 0x90, 0x9e, 0xc1, 0xe1, 0xc2, 0xb7, 0xf0, 0x9f, 0x6f, 0xd9
+            };
             AEADSodiumEncryptor encryptor = new AEADSodiumEncryptor("chacha20-ietf-poly1305", pass);
             encryptor.DeriveSessionKey(saltBytes, masterKeyBytes, skey1);
             string skey1str = Convert.ToBase64String(skey1);
@@ -384,7 +418,11 @@ namespace test
         public void TestAEADudp()
         {
             string pass = "test-aead-derive-session-key";
-            byte[] saltBytes = { 0x8c, 0xfe, 0x67, 0x9a, 0x4c, 0x05, 0xfe, 0x36, 0xca, 0x00, 0x9c, 0x90, 0xe9, 0x66, 0x5b, 0x48, 0x35, 0x1c, 0x07, 0x55, 0x18, 0x94, 0x32, 0x72, 0xc8, 0x40, 0xd2, 0xfd, 0x1f, 0xd4, 0xf1, 0x22 };
+            byte[] saltBytes =
+            {
+                0x8c, 0xfe, 0x67, 0x9a, 0x4c, 0x05, 0xfe, 0x36, 0xca, 0x00, 0x9c, 0x90, 0xe9, 0x66, 0x5b,
+                0x48, 0x35, 0x1c, 0x07, 0x55, 0x18, 0x94, 0x32, 0x72, 0xc8, 0x40, 0xd2, 0xfd, 0x1f, 0xd4, 0xf1, 0x22
+            };
             AEADEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", pass);
             AEADEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", pass);
             byte[] plain = new byte[4096];
