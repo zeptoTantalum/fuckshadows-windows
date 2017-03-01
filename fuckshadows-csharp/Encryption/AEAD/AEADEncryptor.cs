@@ -206,9 +206,12 @@ namespace Fuckshadows.Encryption.AEAD
 
                 // first get chunk length
                 if (_decCircularBuffer.Size <= CHUNK_LEN_BYTES + tagLen) {
-                    // so we only have length tag?
+                    // so we only have chunk length and its tag?
                     return;
                 }
+
+                #region Chunk Decryption
+
                 byte[] encLenBytes = _decCircularBuffer.Peek(CHUNK_LEN_BYTES + tagLen);
                 int decChunkLenLength = - 1;
                 byte[] decChunkLenBytes = new byte[CHUNK_LEN_BYTES];
@@ -230,6 +233,8 @@ namespace Fuckshadows.Encryption.AEAD
                 cipherDecrypt(encChunkBytes, chunkLen + tagLen, decChunkBytes, ref decChunkLen);
                 Debug.Assert(decChunkLen == chunkLen);
                 IncrementNonce();
+
+                #endregion
 
                 // output to outbuf
                 Buffer.BlockCopy(decChunkBytes, 0, outbuf, plainOffset, decChunkLen);

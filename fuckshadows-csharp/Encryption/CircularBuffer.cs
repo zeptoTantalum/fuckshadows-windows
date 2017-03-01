@@ -359,13 +359,13 @@ namespace Cyotek.Collections.Generic
       return item;
     }
 
-    /// <summary>
-    /// Returns the specified number of objects from the beginning of the <see cref="CircularBuffer{T}"/>.
-    /// </summary>
-    /// <param name="count">The number of elements to return from the <see cref="CircularBuffer{T}"/>.</param>
-    /// <returns>The objects that from the beginning of the <see cref="CircularBuffer{T}"/>.</returns>
-    /// <exception cref="System.InvalidOperationException">Thrown if the buffer is empty.</exception>
-    public virtual T[] Peek(int count)
+        /// <summary>
+        /// Returns the specified number of objects from the beginning of the <see cref="CircularBuffer{T}"/> without removing them.
+        /// </summary>
+        /// <param name="count">The number of elements to return from the <see cref="CircularBuffer{T}"/>.</param>
+        /// <returns>The objects that from the beginning of the <see cref="CircularBuffer{T}"/>.</returns>
+        /// <exception cref="System.InvalidOperationException">Thrown if the buffer is empty.</exception>
+        public virtual T[] Peek(int count)
     {
       T[] items;
 
