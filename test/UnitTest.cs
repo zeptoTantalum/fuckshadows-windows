@@ -427,5 +427,29 @@ namespace test
                 Assert.AreEqual(plain[i], plain2[i]);
             }
         }
+
+        [TestCase]
+        public void TestAEADudp()
+        {
+            string pass = "test-aead-derive-session-key";
+            byte[] saltBytes = { 0x8c, 0xfe, 0x67, 0x9a, 0x4c, 0x05, 0xfe, 0x36, 0xca, 0x00, 0x9c, 0x90, 0xe9, 0x66, 0x5b, 0x48, 0x35, 0x1c, 0x07, 0x55, 0x18, 0x94, 0x32, 0x72, 0xc8, 0x40, 0xd2, 0xfd, 0x1f, 0xd4, 0xf1, 0x22 };
+            AEADEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", pass);
+            AEADEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", pass);
+            byte[] plain = new byte[4096];
+            byte[] cipher = new byte[8192];
+            byte[] plain2 = new byte[4096];
+            int cipherLen;
+            int plain2Len;
+            _random.NextBytes(plain);
+            encryptor.InitCipher(saltBytes, true, false);
+            encryptor.EncryptUDP(plain, 4096, cipher, out cipherLen);
+            decryptor.InitCipher(saltBytes, false, false);
+            decryptor.DecryptUDP(cipher, cipherLen, plain2, out plain2Len);
+            Assert.IsTrue(plain2Len == 4096);
+            for (int i = 0; i < 4096; i++)
+            {
+                Assert.AreEqual(plain[i], plain2[i]);
+            }
+        }
     }
 }

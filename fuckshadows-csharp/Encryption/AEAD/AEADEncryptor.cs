@@ -20,7 +20,7 @@ namespace Fuckshadows.Encryption.AEAD
         private static readonly byte[] PersonalBytes = Encoding.ASCII.GetBytes(Personal);
 
         // for UDP only
-        protected static byte[] _udpTmpBuf = new byte[4096];
+        protected static byte[] _udpTmpBuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
         private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
