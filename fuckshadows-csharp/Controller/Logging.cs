@@ -70,6 +70,18 @@ namespace Fuckshadows.Controller
         }
 
         [Conditional("DEBUG")]
+        public static void Dump(string tag, byte[] arr, int length)
+        {
+            string str = $"{Environment.NewLine}{tag}: ";
+            for (int i = 0; i < length - 1; i++) {
+                str += $"0x{arr[i]:X2}, ";
+            }
+            str += $"0x{arr[length-1]:X2}";
+            str += Environment.NewLine;
+            Debug(str);
+        }
+
+        [Conditional("DEBUG")]
         public static void Debug(EndPoint local, EndPoint remote, int len, string header = null, string tailer = null)
         {
             if (header == null && tailer == null)

@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Net;
 using Cyotek.Collections.Generic;
+using Fuckshadows.Controller;
 using Fuckshadows.Encryption.Exception;
 
 namespace Fuckshadows.Encryption.Stream
@@ -13,12 +14,12 @@ namespace Fuckshadows.Encryption.Stream
         : EncryptorBase
     {
         // for UDP only
-        protected static byte[] _udpTmpBuf = new byte[4096];
+        protected static byte[] _udpTmpBuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
-        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
 
+        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(TCPHandler.BufferSize * 2, false);
+        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(TCPHandler.BufferSize * 2, false);
         protected Dictionary<string, EncryptorInfo> ciphers;
 
         protected byte[] _encryptIV;
@@ -143,9 +144,9 @@ namespace Fuckshadows.Encryption.Stream
                 byte[] iv = _decCircularBuffer.Get(ivLen);
                 initCipher(iv, false);
             }
-            byte[] cipher = _decCircularBuffer.Get(_decCircularBuffer.Size);
-
+            byte[] cipher = _decCircularBuffer.ToArray();
             cipherUpdate(false, cipher.Length, cipher, outbuf);
+            _decCircularBuffer.Clear();
             outlength = cipher.Length;
             // done the decryption
         }

@@ -7,6 +7,7 @@ using System.Net.Sockets;
 using System.Timers;
 using Fuckshadows.Controller.Strategy;
 using Fuckshadows.Encryption;
+using Fuckshadows.Encryption.AEAD;
 using Fuckshadows.Encryption.Exception;
 using Fuckshadows.Model;
 using Fuckshadows.Proxy;
@@ -126,10 +127,14 @@ namespace Fuckshadows.Controller
         private readonly int _proxyTimeout;
 
         // Size of receive buffer.
+        // In general, the plaintext length
         public const int RecvSize = 8192;
-        // TODO: calculate reserved bytes for AEADs
-        public const int RecvReserveSize = 123; // reserve for AEAD ciphers
-        public const int BufferSize = RecvSize + RecvReserveSize + 32;
+
+        // overhead of one chunk, reserved for AEAD ciphers
+        public const int ChunkOverheadSize = 16 * 2 /* two tags */ + AEADEncryptor.CHUNK_LEN_BYTES;
+
+        // In general, the ciphertext length, we should take overhead into account
+        public const int BufferSize = RecvSize + ChunkOverheadSize + 32 /* max salt len */;
 
         public DateTime lastActivity;
 
@@ -159,9 +164,13 @@ namespace Fuckshadows.Controller
         private int _totalRead = 0;
         private int _totalWrite = 0;
 
-        private byte[] _remoteRecvBuffer = new byte[MAX_INPUT_SIZE * 2];
-        private byte[] _remoteSendBuffer = new byte[MAX_INPUT_SIZE * 2];
-        private byte[] _connetionRecvBuffer = new byte[BufferSize];
+        // remote -> local proxy (ciphertext, before decrypt)
+        private byte[] _remoteRecvBuffer = new byte[BufferSize];
+        // client -> local proxy (plaintext, before encrypt)
+        private byte[] _connetionRecvBuffer = new byte[RecvSize];
+        // local proxy -> remote (plaintext, after decrypt)
+        private byte[] _remoteSendBuffer = new byte[RecvSize];
+        // local proxy -> client (ciphertext, before decrypt)
         private byte[] _connetionSendBuffer = new byte[BufferSize];
 
         private bool _connectionShutdown = false;
@@ -197,13 +206,9 @@ namespace Fuckshadows.Controller
                 _destEndPoint);
             if (server == null || server.server == "")
                 throw new ArgumentException("No server configured");
-            lock (_encryptionLock)
-            {
-                lock (_decryptionLock)
-                {
-                    _encryptor = EncryptorFactory.GetEncryptor(server.method, server.password);
-                }
-            }
+
+            _encryptor = EncryptorFactory.GetEncryptor(server.method, server.password);
+
             this._server = server;
 
             /* prepare address buffer for AEAD */
@@ -597,8 +602,7 @@ namespace Fuckshadows.Controller
                     _currentRemoteSession = session;
                 }
 
-                ProxyTimer proxyTimer = new ProxyTimer(_proxyTimeout);
-                proxyTimer.AutoReset = false;
+                ProxyTimer proxyTimer = new ProxyTimer(_proxyTimeout) { AutoReset = false };
                 proxyTimer.Elapsed += proxyConnectTimer_Elapsed;
                 proxyTimer.Enabled = true;
 

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Fuckshadows.Controller;
 using Fuckshadows.Encryption.Exception;
 
 namespace Fuckshadows.Encryption.AEAD
@@ -38,10 +39,12 @@ namespace Fuckshadows.Encryption.AEAD
             }
             else
             {
+                _sodiumKey = new byte[keyLen];
                 DeriveSessionKey(isEncrypt ? _encryptSalt : _decryptSalt,
                     _Masterkey, _sessionKey);
-                _sodiumKey = _sessionKey;
+                Buffer.BlockCopy(_sessionKey, 0, _sodiumKey, 0, keyLen);
             }
+            Logging.Dump("_sodiumKey", _sodiumKey, keyLen);
         }
 
         protected override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
@@ -50,6 +53,8 @@ namespace Fuckshadows.Encryption.AEAD
             // outbuf: ciphertext + tag
             int ret;
             ulong encClen = 0;
+            Logging.Dump("_encNonce before enc", _encNonce, nonceLen);
+            Logging.Dump("before cipherEncrypt: plain", plaintext, plen);
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_encrypt(ciphertext, ref encClen,
@@ -71,6 +76,7 @@ namespace Fuckshadows.Encryption.AEAD
             }
             if (ret != 0) throw new CryptoErrorException();
             Debug.Assert((int)encClen == plen + tagLen);
+            Logging.Dump("after cipherEncrypt: cipher", ciphertext, (int)encClen);
             clen = plen + tagLen;
             return ret;
         }
@@ -81,6 +87,8 @@ namespace Fuckshadows.Encryption.AEAD
             // outbuf: plaintext
             int ret;
             ulong decPlen = 0;
+            Logging.Dump("_decNonce before dec", _decNonce, nonceLen);
+            Logging.Dump("before cipherDecrypt: cipher", ciphertext, clen);
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_decrypt(plaintext, ref decPlen,
@@ -102,6 +110,7 @@ namespace Fuckshadows.Encryption.AEAD
 
             if (ret != 0) throw new CryptoErrorException();
             Debug.Assert((int)decPlen == clen - tagLen);
+            Logging.Dump("after cipherDecrypt: plain", plaintext, (int)decPlen);
             plen = clen - tagLen;
             return ret;
         }
