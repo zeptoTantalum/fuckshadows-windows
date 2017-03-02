@@ -134,7 +134,7 @@ namespace Fuckshadows.Controller
         public const int ChunkOverheadSize = 16 * 2 /* two tags */ + AEADEncryptor.CHUNK_LEN_BYTES;
 
         // In general, the ciphertext length, we should take overhead into account
-        public const int BufferSize = RecvSize + ChunkOverheadSize + 32 /* max salt len */;
+        public const int BufferSize = RecvSize + ChunkOverheadSize + 32 /* max salt len */ + 123 /* a random number */;
 
         public DateTime lastActivity;
 

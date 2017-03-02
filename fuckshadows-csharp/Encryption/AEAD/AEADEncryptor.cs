@@ -24,8 +24,8 @@ namespace Fuckshadows.Encryption.AEAD
         protected static byte[] _udpTmpBuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE, false);
-        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE, false);
+        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
+        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
 
         public const int CHUNK_LEN_BYTES = 2;
         public const int CHUNK_LEN_MASK = 0x3FFF;
@@ -77,8 +77,7 @@ namespace Fuckshadows.Encryption.AEAD
             CipherInfo = ciphers[_method];
             _innerLibName = CipherInfo.InnerLibName;
             _cipher = CipherInfo.Type;
-            if (_cipher == 0)
-            {
+            if (_cipher == 0) {
                 throw new System.Exception("method not found");
             }
             keyLen = CipherInfo.KeySize;
@@ -108,37 +107,30 @@ namespace Fuckshadows.Encryption.AEAD
         public void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
         {
             int ret = Sodium.crypto_generichash_blake2b_salt_personal(sessionKey, keyLen, IntPtr.Zero, 0, masterKey,
-                keyLen, salt, PersonalBytes);
+                                                                      keyLen, salt, PersonalBytes);
             if (ret != 0) throw new System.Exception("failed to generate session key");
         }
 
         protected void IncrementNonce(bool isEncrypt)
         {
-            lock (_nonceIncrementLock)
-            {
+            lock (_nonceIncrementLock) {
                 Sodium.sodium_increment(isEncrypt ? _encNonce : _decNonce, nonceLen);
             }
         }
 
         public virtual void InitCipher(byte[] salt, bool isEncrypt, bool isUdp)
         {
-            if (isEncrypt)
-            {
+            if (isEncrypt) {
                 _encryptSalt = new byte[saltLen];
                 Array.Copy(salt, _encryptSalt, saltLen);
-            }
-            else
-            {
+            } else {
                 _decryptSalt = new byte[saltLen];
                 Array.Copy(salt, _decryptSalt, saltLen);
             }
             Logging.Dump("Salt", salt, saltLen);
         }
 
-        public static void randBytes(byte[] buf, int length)
-        {
-            RNG.GetBytes(buf, length);
-        }
+        public static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
 
         protected abstract int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen);
 
@@ -150,132 +142,142 @@ namespace Fuckshadows.Encryption.AEAD
         {
             Debug.Assert(_encCircularBuffer != null, "_encCircularBuffer != null");
 
-                _encCircularBuffer.Put(buf, 0, length);
-                outlength = 0;
-                if (!_encryptSaltSent)
-                {
-                    // Generate salt
-                    byte[] saltBytes = new byte[saltLen];
-                    randBytes(saltBytes, saltLen);
-                    InitCipher(saltBytes, true, false);
-                    Buffer.BlockCopy(saltBytes, 0, outbuf, 0, saltLen);
-                    outlength = saltLen;
-                    _encryptSaltSent = true;
+            _encCircularBuffer.Put(buf, 0, length);
+            outlength = 0;
+            if (! _encryptSaltSent) {
+                _encryptSaltSent = true;
+                // Generate salt
+                byte[] saltBytes = new byte[saltLen];
+                randBytes(saltBytes, saltLen);
+                InitCipher(saltBytes, true, false);
+                Buffer.BlockCopy(saltBytes, 0, outbuf, 0, saltLen);
+                outlength = saltLen;
+            }
+
+            if (! _tcpRequestSent) {
+                _tcpRequestSent = true;
+                // The first TCP request
+                int encAddrBufLength;
+                byte[] encAddrBufBytes = new byte[AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES];
+                byte[] addrBytes = new byte[AddrBufLength];
+                Buffer.BlockCopy(AddrBufBytes, 0, addrBytes, 0, AddrBufLength);
+
+                ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
+                Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
+                Logging.Debug("_tcpRequestSent outlength " + outlength);
+                Buffer.BlockCopy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
+
+                outlength += encAddrBufLength;
+                // skip address buffer
+                _encCircularBuffer.Get(AddrBufLength);
+            }
+
+            int bufSize;
+            // handle other chunks
+            while (true) {
+                bufSize = _encCircularBuffer.Size;
+                if (bufSize <= 0) return;
+                int chunklength = Math.Min(CHUNK_LEN_MASK, bufSize);
+                byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
+                int encChunkLength;
+                byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
+                ChunkEncrypt(chunkBytes, chunklength, encChunkBytes, out encChunkLength);
+                Debug.Assert(encChunkLength == chunklength + tagLen * 2 + CHUNK_LEN_BYTES);
+                Buffer.BlockCopy(encChunkBytes, 0, outbuf, outlength, encChunkLength);
+                outlength += encChunkLength;
+                Logging.Debug("chunks enc outlength " + outlength);
+                // check if we have enough space for outbuf
+                if (outlength + TCPHandler.ChunkOverheadSize > TCPHandler.RecvSize) {
+                    Logging.Debug("enc outbuf almost full, giving up");
+                    return;
                 }
-
-                if (!_tcpRequestSent)
-                {
-                    // The first TCP request
-                    int encAddrBufLength;
-                    byte[] encAddrBufBytes = new byte[AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES];
-                    byte[] addrBytes = new byte[AddrBufLength];
-                    Buffer.BlockCopy(AddrBufBytes, 0, addrBytes, 0, AddrBufLength);
-
-                    ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
-                    Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
-                    Buffer.BlockCopy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
-                    _tcpRequestSent = true;
-                    outlength += encAddrBufLength;
-                    // skip address buffer
-                    _encCircularBuffer.Take(AddrBufLength);
+                bufSize = _encCircularBuffer.Size;
+                if (bufSize <= 0) {
+                    Logging.Debug("No more data to encrypt, leaving");
+                    return;
                 }
-
-                int bufSize;
-                // handle other chunks
-                while (true) {
-                    bufSize = _encCircularBuffer.Size;
-                    int chunklength = Math.Min(CHUNK_LEN_MASK, bufSize);
-                    byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
-                    int encChunkLength;
-                    byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
-                    ChunkEncrypt(chunkBytes, chunklength, encChunkBytes, out encChunkLength);
-                    Debug.Assert(encChunkLength == chunklength + tagLen * 2 + CHUNK_LEN_BYTES);
-                    Buffer.BlockCopy(encChunkBytes, 0, outbuf, outlength, encChunkLength);
-                    outlength += encChunkLength;
-                    // check if we have enough space for outbuf
-                    if (outlength + TCPHandler.ChunkOverheadSize > TCPHandler.RecvSize) return;
-                    if (_encCircularBuffer.Size <= 0) return;
-                }
-
+            }
         }
 
-        
+
         public override void Decrypt(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
             Debug.Assert(_decCircularBuffer != null, "_decCircularBuffer != null");
             int bufSize;
 
-                outlength = 0;
-                // drop all into buffer
+            outlength = 0;
+            // drop all into buffer
 
-                _decCircularBuffer.Put(buf, 0, length);
-                if (!_decryptSaltReceived) {
-                    bufSize = _decCircularBuffer.Size;
-                    // check if we get the leading salt
-                    if (bufSize <= saltLen)
-                    {
-                        // need more
-                        return;
-                    }
-                    _decryptSaltReceived = true;
-                    byte[] salt = _decCircularBuffer.Get(saltLen);
-                    InitCipher(salt, false, false);
+            _decCircularBuffer.Put(buf, 0, length);
+            if (! _decryptSaltReceived) {
+                bufSize = _decCircularBuffer.Size;
+                // check if we get the leading salt
+                if (bufSize <= saltLen) {
+                    // need more
+                    return;
+                }
+                _decryptSaltReceived = true;
+                byte[] salt = _decCircularBuffer.Get(saltLen);
+                InitCipher(salt, false, false);
                 Logging.Debug("get salt len " + saltLen);
+            }
+
+            // handle chunks
+            while (true) {
+                bufSize = _decCircularBuffer.Size;
+                // check if we have any data
+                if (bufSize <= 0) {
+                    Logging.Debug("No data in _decCircularBuffer");
+                    return;
                 }
 
-                // handle chunks
-                while (true) {
-                    bufSize = _decCircularBuffer.Size;
-                    // check if we have any data
-                    if (bufSize <= 0) {
-                        return;
-                    }
+                // first get chunk length
+                if (bufSize <= CHUNK_LEN_BYTES + tagLen) {
+                    // so we only have chunk length and its tag?
+                    return;
+                }
 
-                    // first get chunk length
-                    if (bufSize <= CHUNK_LEN_BYTES + tagLen)
-                    {
-                        // so we only have chunk length and its tag?
-                        return;
-                    }
+                #region Chunk Decryption
 
-                    #region Chunk Decryption
-
-                    byte[] encLenBytes = _decCircularBuffer.Peek(CHUNK_LEN_BYTES + tagLen);
-                    int decChunkLenLength = -1;
-                    byte[] decChunkLenBytes = new byte[CHUNK_LEN_BYTES];
-                    // try to dec chunk len
-                    cipherDecrypt(encLenBytes, CHUNK_LEN_BYTES + tagLen, decChunkLenBytes, ref decChunkLenLength);
-                    Debug.Assert(decChunkLenLength == CHUNK_LEN_BYTES);
-                    // finally we get the real chunk len
-                    int chunkLen = IPAddress.NetworkToHostOrder(BitConverter.ToUInt16(decChunkLenBytes, 0));
-                    bufSize = _decCircularBuffer.Size;
-                    if (bufSize < CHUNK_LEN_BYTES + tagLen /* we haven't remove them */+ chunkLen + tagLen)
-                    {
-                    Logging.Debug("No more data to decrypt one chunk");
-                        return;
-                    }
-                    IncrementNonce(false);
+                byte[] encLenBytes = _decCircularBuffer.Peek(CHUNK_LEN_BYTES + tagLen);
+                int decChunkLenLength = - 1;
+                byte[] decChunkLenBytes = new byte[CHUNK_LEN_BYTES];
+                // try to dec chunk len
+                cipherDecrypt(encLenBytes, CHUNK_LEN_BYTES + tagLen, decChunkLenBytes, ref decChunkLenLength);
+                Debug.Assert(decChunkLenLength == CHUNK_LEN_BYTES);
+                // finally we get the real chunk len
+                int chunkLen = IPAddress.NetworkToHostOrder((short)BitConverter.ToUInt16(decChunkLenBytes, 0));
                 Logging.Debug("Get the real chunk len:" + chunkLen);
-                    // we have enough data to decrypt one chunk
-                    // drop chunk len and its tag from buffer
-                    _decCircularBuffer.Get(CHUNK_LEN_BYTES + tagLen);
-                    byte[] encChunkBytes = _decCircularBuffer.Get(chunkLen + tagLen);
-                    byte[] decChunkBytes = new byte[chunkLen];
-                    int decChunkLen = -1;
-                    cipherDecrypt(encChunkBytes, chunkLen + tagLen, decChunkBytes, ref decChunkLen);
-                    Debug.Assert(decChunkLen == chunkLen);
-                    IncrementNonce(false);
-
-                    #endregion
-
-                    // output to outbuf
-                    Buffer.BlockCopy(decChunkBytes, 0, outbuf, outlength, decChunkLen);
-                    outlength += decChunkLen;
-                Logging.Debug("aead dec outlength " + outlength);
-                    bufSize = _decCircularBuffer.Size;
-                    // check if we already done all of them
-                    if (bufSize <= 0) return;
+                bufSize = _decCircularBuffer.Size;
+                if (bufSize < CHUNK_LEN_BYTES + tagLen /* we haven't remove them */+ chunkLen + tagLen) {
+                    Logging.Debug("No more data to decrypt one chunk");
+                    return;
                 }
+                IncrementNonce(false);
+
+                // we have enough data to decrypt one chunk
+                // drop chunk len and its tag from buffer
+                _decCircularBuffer.Get(CHUNK_LEN_BYTES + tagLen);
+                byte[] encChunkBytes = _decCircularBuffer.Get(chunkLen + tagLen);
+                byte[] decChunkBytes = new byte[chunkLen];
+                int decChunkLen = - 1;
+                cipherDecrypt(encChunkBytes, chunkLen + tagLen, decChunkBytes, ref decChunkLen);
+                Debug.Assert(decChunkLen == chunkLen);
+                IncrementNonce(false);
+
+                #endregion
+
+                // output to outbuf
+                Buffer.BlockCopy(decChunkBytes, 0, outbuf, outlength, decChunkLen);
+                outlength += decChunkLen;
+                Logging.Debug("aead dec outlength " + outlength);
+                bufSize = _decCircularBuffer.Size;
+                // check if we already done all of them
+                if (bufSize <= 0) {
+                    Logging.Debug("No data in _decCircularBuffer, already all done");
+                    return;
+                }
+            }
         }
 
         #endregion
@@ -287,9 +289,8 @@ namespace Fuckshadows.Encryption.AEAD
             // Generate salt
             randBytes(outbuf, saltLen);
             InitCipher(outbuf, true, true);
-            int olen = -1;
-            lock (_udpTmpBuf)
-            {
+            int olen = - 1;
+            lock (_udpTmpBuf) {
                 cipherEncrypt(buf, length, _udpTmpBuf, ref olen);
                 Debug.Assert(olen == length + tagLen);
                 Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, saltLen, olen);
@@ -300,9 +301,8 @@ namespace Fuckshadows.Encryption.AEAD
         public override void DecryptUDP(byte[] buf, int length, byte[] outbuf, out int outlength)
         {
             InitCipher(buf, false, true);
-            int olen = -1;
-            lock (_udpTmpBuf)
-            {
+            int olen = - 1;
+            lock (_udpTmpBuf) {
                 // copy remaining data to first pos
                 Buffer.BlockCopy(buf, saltLen, buf, 0, length - saltLen);
                 cipherDecrypt(buf, length - saltLen, _udpTmpBuf, ref olen);
@@ -320,8 +320,8 @@ namespace Fuckshadows.Encryption.AEAD
             int chunkLen = plainLen & CHUNK_LEN_MASK;
             byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
             byte[] encBytes = new byte[chunkLen + tagLen];
-            int encChunkLenLength = -1;
-            int encBufLength = -1;
+            int encChunkLenLength = - 1;
+            int encBufLength = - 1;
             byte[] lenbuf = BitConverter.GetBytes((ushort) IPAddress.HostToNetworkOrder((short) chunkLen));
 
             // encrypt len
