@@ -325,7 +325,7 @@ namespace Fuckshadows.Encryption.AEAD
             byte[] lenbuf = BitConverter.GetBytes((ushort) IPAddress.HostToNetworkOrder((short) chunkLen));
 
             // encrypt len
-            cipherEncrypt(lenbuf, 2, encLenBytes, ref encChunkLenLength);
+            cipherEncrypt(lenbuf, CHUNK_LEN_BYTES, encLenBytes, ref encChunkLenLength);
             Debug.Assert(encChunkLenLength == CHUNK_LEN_BYTES + tagLen);
             IncrementNonce(true);
 
