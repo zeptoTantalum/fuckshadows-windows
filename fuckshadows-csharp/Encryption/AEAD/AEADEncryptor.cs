@@ -327,22 +327,23 @@ namespace Fuckshadows.Encryption.AEAD
         // we know the plaintext length before encryption, so we can do it in one operation
         private void ChunkEncrypt(byte[] plaintext, int plainLen, byte[] ciphertext, out int cipherLen)
         {
-            // we already make sure chunk length is less or equal to CHUNK_LEN_MASK
-            int chunkLen = plainLen & CHUNK_LEN_MASK;
-            byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
-            byte[] encBytes = new byte[chunkLen + tagLen];
-            int encChunkLenLength = - 1;
-            int encBufLength = - 1;
-            byte[] lenbuf = BitConverter.GetBytes((ushort) IPAddress.HostToNetworkOrder((short) chunkLen));
+            if (plainLen > CHUNK_LEN_MASK) {
+                throw new CryptoErrorException("chunk too big");
+            }
 
             // encrypt len
+            byte[] encLenBytes = new byte[CHUNK_LEN_BYTES + tagLen];
+            int encChunkLenLength = - 1;
+            byte[] lenbuf = BitConverter.GetBytes((ushort) IPAddress.HostToNetworkOrder((short)plainLen));
             cipherEncrypt(lenbuf, CHUNK_LEN_BYTES, encLenBytes, ref encChunkLenLength);
             Debug.Assert(encChunkLenLength == CHUNK_LEN_BYTES + tagLen);
             IncrementNonce(true);
 
             // encrypt corresponding data
-            cipherEncrypt(plaintext, chunkLen, encBytes, ref encBufLength);
-            Debug.Assert(encBufLength == chunkLen + tagLen);
+            byte[] encBytes = new byte[plainLen + tagLen];
+            int encBufLength = -1;
+            cipherEncrypt(plaintext, plainLen, encBytes, ref encBufLength);
+            Debug.Assert(encBufLength == plainLen + tagLen);
             IncrementNonce(true);
 
             // construct outbuf

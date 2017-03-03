@@ -16,7 +16,8 @@ namespace Fuckshadows.Encryption.AEAD
         private const int CIPHER_CHACHA20IETFPOLY1305 = 2;
         private const int CIPHER_XCHACHA20IETFPOLY1305 = 3;
 
-        private byte[] _sodiumKey;
+        private byte[] _sodiumKey = null;
+
         public AEADSodiumEncryptor(string method, string password)
             : base(method, password) { }
 
@@ -39,16 +40,16 @@ namespace Fuckshadows.Encryption.AEAD
             }
             else
             {
-                _sodiumKey = new byte[keyLen];
                 DeriveSessionKey(isEncrypt ? _encryptSalt : _decryptSalt,
                     _Masterkey, _sessionKey);
-                Buffer.BlockCopy(_sessionKey, 0, _sodiumKey, 0, keyLen);
+                _sodiumKey = _sessionKey;
             }
             Logging.Dump("_sodiumKey", _sodiumKey, keyLen);
         }
 
         public override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
         {
+            Debug.Assert(_sodiumKey != null);
             // buf: all plaintext
             // outbuf: ciphertext + tag
             int ret;
@@ -75,14 +76,14 @@ namespace Fuckshadows.Encryption.AEAD
                     throw new System.Exception("not implemented");
             }
             if (ret != 0) throw new CryptoErrorException();
-            Debug.Assert((int)encClen == plen + tagLen);
             Logging.Dump("after cipherEncrypt: cipher", ciphertext, (int)encClen);
-            clen = plen + tagLen;
+            clen = (int)encClen;
             return ret;
         }
 
         public override int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
         {
+            Debug.Assert(_sodiumKey != null);
             // buf: ciphertext + tag
             // outbuf: plaintext
             int ret;
@@ -109,9 +110,8 @@ namespace Fuckshadows.Encryption.AEAD
             }
 
             if (ret != 0) throw new CryptoErrorException();
-            Debug.Assert((int)decPlen == clen - tagLen);
             Logging.Dump("after cipherDecrypt: plain", plaintext, (int)decPlen);
-            plen = clen - tagLen;
+            plen = (int)decPlen;
             return ret;
         }
 

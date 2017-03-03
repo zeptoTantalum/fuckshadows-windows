@@ -12,6 +12,7 @@ namespace Fuckshadows.Encryption
         const string DLLNAME = "libfscrypto";
 
         private static bool _initialized = false;
+        private static readonly object _initLock = new object();
 
         static Sodium()
         {
@@ -29,16 +30,18 @@ namespace Fuckshadows.Encryption
             }
             LoadLibrary(dllPath);
 
-            if (!_initialized)
-            {
-                int ret = sodium_init();
-                if (ret == -1)
+            lock (_initLock) {
+                if (!_initialized)
                 {
-                    throw new System.Exception("Failed to initialize sodium");
-                }
-                else /* 1 means already initialized; 0 means success */
-                {
-                    _initialized = true;
+                    int ret = sodium_init();
+                    if (ret == -1)
+                    {
+                        throw new System.Exception("Failed to initialize sodium");
+                    }
+                    else /* 1 means already initialized; 0 means success */
+                    {
+                        _initialized = true;
+                    }
                 }
             }
         }
