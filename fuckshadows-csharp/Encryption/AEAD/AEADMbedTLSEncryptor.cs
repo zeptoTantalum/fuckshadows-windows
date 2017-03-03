@@ -64,7 +64,7 @@ namespace Fuckshadows.Encryption.AEAD
             if (ret != 0) throw new System.Exception("failed to finish preparation");
         }
 
-        protected override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
+        public override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
         {
             // buf: all plaintext
             // outbuf: ciphertext + tag
@@ -94,7 +94,7 @@ namespace Fuckshadows.Encryption.AEAD
             }
         }
 
-        protected override int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
+        public override int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
         {
             // buf: ciphertext + tag
             // outbuf: plaintext

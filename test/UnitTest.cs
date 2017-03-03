@@ -16,9 +16,32 @@ namespace test
     [TestFixture]
     public class UnitTest
     {
+        #region Test helper
+
+        [SetUp]
+        public void Setup() { RNG.Reload(); }
+
+        [TearDown]
+        public void TearDown()
+        {
+            RNG.Close();
+            // reset flag in case they interfere each other
+            encryptionFailed = false;
+        }
+
+        [OneTimeSetUp]
+        public void OneTimeSetup() { _random = new Random(); }
+
+        [OneTimeTearDown]
+        public void OneTimeTearDown() { RNG.Close(); }
+
+        private Random _random = null;
+        private static bool encryptionFailed = false;
+
+        #endregion
+
         private void RunStreamEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
         {
-            RNG.Reload();
             byte[] plain = new byte[16384];
             const int IV = 16;
             byte[] cipher = new byte[plain.Length + IV];
@@ -30,30 +53,26 @@ namespace test
             encryptor.Encrypt(plain, plain.Length, cipher, out outLen);
             decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
             Assert.AreEqual(plain.Length, outLen2);
-            for (int j = 0; j < plain.Length; j++)
-            {
+            for (int j = 0; j < plain.Length; j++) {
                 Assert.AreEqual(plain[j], plain2[j]);
             }
             encryptor.Encrypt(plain, 1000, cipher, out outLen);
             decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
             Assert.AreEqual(1000, outLen2);
-            for (int j = 0; j < outLen2; j++)
-            {
+            for (int j = 0; j < outLen2; j++) {
                 Assert.AreEqual(plain[j], plain2[j]);
             }
             encryptor.Encrypt(plain, 12333, cipher, out outLen);
             decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
             Assert.AreEqual(12333, outLen2);
-            for (int j = 0; j < outLen2; j++)
-            {
+            for (int j = 0; j < outLen2; j++) {
                 Assert.AreEqual(plain[j], plain2[j]);
             }
         }
 
         private void RunAEADEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
         {
-            RNG.Reload();
-            byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
+            byte[] abufBytes = { 3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187 };
             byte[] plain = new byte[16384 * 2];
             const int Salt = 32;
             // make the cipher array large enough to hold chunks
@@ -87,10 +106,7 @@ namespace test
             }
         }
 
-        private Random _random = new Random();
-        private static bool encryptionFailed = false;
-
-        [TestCase]
+        [Test]
         public void TestCompareVersion()
         {
             Assert.IsTrue(UpdateChecker.Asset.CompareVersion("2.3.1.0", "2.3.1") == 0);
@@ -102,54 +118,53 @@ namespace test
             Assert.IsTrue(UpdateChecker.Asset.CompareVersion("1.3.2", "1.3.1") > 0);
         }
 
-        [TestCase]
+        [Test]
         public void TestHotKey2Str()
         {
             Assert.AreEqual("Ctrl+A", HotKeys.HotKey2Str(Key.A, ModifierKeys.Control));
             Assert.AreEqual("Ctrl+Alt+D2", HotKeys.HotKey2Str(Key.D2, (ModifierKeys.Alt | ModifierKeys.Control)));
             Assert.AreEqual("Ctrl+Alt+Shift+NumPad7",
-                HotKeys.HotKey2Str(Key.NumPad7, (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift)));
+                            HotKeys.HotKey2Str(Key.NumPad7, (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift)));
             Assert.AreEqual("Ctrl+Alt+Shift+F6",
-                HotKeys.HotKey2Str(Key.F6, (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift)));
+                            HotKeys.HotKey2Str(Key.F6, (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift)));
             Assert.AreNotEqual("Ctrl+Shift+Alt+F6",
-                HotKeys.HotKey2Str(Key.F6, (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift)));
+                               HotKeys.HotKey2Str(Key.F6, (ModifierKeys.Alt | ModifierKeys.Control | ModifierKeys.Shift)));
         }
 
-        [TestCase]
+        [Test]
         public void TestStr2HotKey()
         {
             Assert.IsTrue(HotKeys.Str2HotKey("Ctrl+A").Equals(new HotKey(Key.A, ModifierKeys.Control)));
             Assert.IsTrue(
-                HotKeys.Str2HotKey("Ctrl+Alt+A").Equals(new HotKey(Key.A, (ModifierKeys.Control | ModifierKeys.Alt))));
+                          HotKeys.Str2HotKey("Ctrl+Alt+A").Equals(new HotKey(Key.A, (ModifierKeys.Control | ModifierKeys.Alt))));
             Assert.IsTrue(
-                HotKeys.Str2HotKey("Ctrl+Shift+A")
-                    .Equals(new HotKey(Key.A, (ModifierKeys.Control | ModifierKeys.Shift))));
+                          HotKeys.Str2HotKey("Ctrl+Shift+A")
+                                 .Equals(new HotKey(Key.A, (ModifierKeys.Control | ModifierKeys.Shift))));
             Assert.IsTrue(
-                HotKeys.Str2HotKey("Ctrl+Alt+Shift+A")
-                    .Equals(new HotKey(Key.A, (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
+                          HotKeys.Str2HotKey("Ctrl+Alt+Shift+A")
+                                 .Equals(new HotKey(Key.A, (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
             HotKey testKey0 = HotKeys.Str2HotKey("Ctrl+Alt+Shift+A");
             Assert.IsTrue(testKey0 != null &&
                           testKey0.Equals(new HotKey(Key.A,
-                              (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
+                                                     (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
             HotKey testKey1 = HotKeys.Str2HotKey("Ctrl+Alt+Shift+F2");
             Assert.IsTrue(testKey1 != null &&
                           testKey1.Equals(new HotKey(Key.F2,
-                              (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
+                                                     (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
             HotKey testKey2 = HotKeys.Str2HotKey("Ctrl+Shift+Alt+D7");
             Assert.IsTrue(testKey2 != null &&
                           testKey2.Equals(new HotKey(Key.D7,
-                              (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
+                                                     (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
             HotKey testKey3 = HotKeys.Str2HotKey("Ctrl+Shift+Alt+NumPad7");
             Assert.IsTrue(testKey3 != null &&
                           testKey3.Equals(new HotKey(Key.NumPad7,
-                              (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
+                                                     (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Shift))));
         }
 
-        [TestCase]
+        [Test]
         public void TestMD5()
         {
-            for (int len = 1; len < 64; len++)
-            {
+            for (int len = 1; len < 64; len++) {
                 System.Security.Cryptography.MD5 md5 = System.Security.Cryptography.MD5.Create();
                 byte[] bytes = new byte[len];
                 _random.NextBytes(bytes);
@@ -159,159 +174,131 @@ namespace test
             }
         }
 
-        [TestCase]
+        [Test]
         public void TestStreamMbedTLSEncryption()
         {
             bool encryptionFailed = false;
             List<Thread> threads = new List<Thread>();
-            for (int i = 0; i < 10; i++)
-            {
+            for (int i = 0; i < 10; i++) {
                 Thread t = new Thread(RunSingleStreamMbedTLSEncryptionThread);
                 threads.Add(t);
                 t.Start();
             }
-            foreach (Thread t in threads)
-            {
+            foreach (Thread t in threads) {
                 t.Join();
             }
-            RNG.Close();
             Assert.IsFalse(encryptionFailed);
         }
 
         private void RunSingleStreamMbedTLSEncryptionThread()
         {
-            try
-            {
-                for (int i = 0; i < 100; i++)
-                {
+            try {
+                for (int i = 0; i < 100; i++) {
                     IEncryptor encryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!");
                     IEncryptor decryptor = new StreamMbedTLSEncryptor("aes-256-cfb", "barfoo!");
                     RunStreamEncryptionRound(encryptor, decryptor);
                 }
-            }
-            catch
-            {
+            } catch {
                 encryptionFailed = true;
                 throw;
             }
         }
 
-        [TestCase]
+        [Test]
         public void TestAEADMbedTLSEncryption()
         {
             bool encryptionFailed = false;
             List<Thread> threads = new List<Thread>();
-            for (int i = 0; i < 10; i++)
-            {
+            for (int i = 0; i < 10; i++) {
                 Thread t = new Thread(RunSingleAEADMbedTLSEncryptionThread);
                 threads.Add(t);
                 t.Start();
             }
-            foreach (Thread t in threads)
-            {
+            foreach (Thread t in threads) {
                 t.Join();
             }
-            RNG.Close();
             Assert.IsFalse(encryptionFailed);
         }
-
-        private void RunSingleAEADMbedTLSEncryptionThread(object o)
+        
+        public void RunSingleAEADMbedTLSEncryptionThread()
         {
-            try
-            {
+            try {
                 byte[] abufBytes = { 3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187 };
                 int abufLen = abufBytes.Length;
-                for (int i = 0; i < 100; i++)
-                {
+                for (int i = 0; i < 100; i++) {
                     IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
                     IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
                     Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
                     encryptor.AddrBufLength = abufLen;
                     RunAEADEncryptionRound(encryptor, decryptor);
                 }
-            }
-            catch
-            {
+            } catch {
                 encryptionFailed = true;
                 throw;
             }
         }
 
-        [TestCase]
+        [Test]
         public void TestRC4Encryption()
         {
             // run it once before the multi-threading test to initialize global tables
             RunSingleRC4EncryptionThread();
             List<Thread> threads = new List<Thread>();
-            for (int i = 0; i < 10; i++)
-            {
+            for (int i = 0; i < 10; i++) {
                 Thread t = new Thread(RunSingleRC4EncryptionThread);
                 threads.Add(t);
                 t.Start();
             }
-            foreach (Thread t in threads)
-            {
+            foreach (Thread t in threads) {
                 t.Join();
             }
-            RNG.Close();
             Assert.IsFalse(encryptionFailed);
         }
 
         private void RunSingleRC4EncryptionThread()
         {
-            try
-            {
-                for (int i = 0; i < 100; i++)
-                {
+            try {
+                for (int i = 0; i < 100; i++) {
                     IEncryptor encryptor = new StreamMbedTLSEncryptor("rc4-md5", "barfoo!");
                     IEncryptor decryptor = new StreamMbedTLSEncryptor("rc4-md5", "barfoo!");
                     RunStreamEncryptionRound(encryptor, decryptor);
                 }
-            }
-            catch
-            {
+            } catch {
                 encryptionFailed = true;
                 throw;
             }
         }
 
-        [TestCase]
+        [Test]
         public void TestStreamSodiumEncryption()
         {
             List<Thread> threads = new List<Thread>();
-            for (int i = 0; i < 10; i++)
-            {
+            for (int i = 0; i < 10; i++) {
                 Thread t = new Thread(RunSingleStreamSodiumEncryptionThread);
                 threads.Add(t);
                 t.Start();
             }
-            foreach (Thread t in threads)
-            {
+            foreach (Thread t in threads) {
                 t.Join();
             }
-            RNG.Close();
             Assert.IsFalse(encryptionFailed);
         }
 
         private void RunSingleStreamSodiumEncryptionThread()
         {
-            try
-            {
-                for (int i = 0; i < 100; i++)
-                {
+            try {
+                for (int i = 0; i < 100; i++) {
                     IEncryptor encryptor = new StreamSodiumEncryptor("salsa20", "barfoo!");
                     IEncryptor decryptor = new StreamSodiumEncryptor("salsa20", "barfoo!");
                     RunStreamEncryptionRound(encryptor, decryptor);
                 }
-            }
-            catch
-            {
+            } catch {
                 encryptionFailed = true;
                 throw;
             }
         }
 
-        [TestCase]
+        [Test]
         public void TestAEADSodiumEncryption()
         {
             List<Thread> threads = new List<Thread>();
@@ -325,7 +312,6 @@ namespace test
             {
                 t.Join();
             }
-            RNG.Close();
             Assert.IsFalse(encryptionFailed);
         }
 
@@ -333,7 +319,7 @@ namespace test
         {
             try
             {
-                byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
+                byte[] abufBytes = { 3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187 };
                 int abufLen = abufBytes.Length;
                 for (int i = 0; i < 100; i++)
                 {
@@ -351,7 +337,7 @@ namespace test
             }
         }
 
-        [TestCase]
+        [Test]
         public void TestLegacyDeriveKey()
         {
             string pass = "test-legacy";
@@ -368,7 +354,7 @@ namespace test
             Assert.IsTrue(key1str == key2str);
         }
 
-        [TestCase]
+        [Test]
         public void TestDeriveKey()
         {
             string pass = "test-aead-derive-key";
@@ -386,7 +372,7 @@ namespace test
             Assert.IsTrue(key1str == key2str);
         }
 
-        [TestCase]
+        [Test]
         public void TestDeriveSessionKey()
         {
             string pass = "test-aead-derive-session-key";
@@ -414,7 +400,7 @@ namespace test
             Assert.IsTrue(skey1str == skey2str);
         }
 
-        [TestCase]
+        [Test]
         public void TestAEADudp()
         {
             string pass = "test-aead-derive-session-key";
@@ -436,8 +422,7 @@ namespace test
             decryptor.InitCipher(saltBytes, false, true);
             decryptor.DecryptUDP(cipher, cipherLen, plain2, out plain2Len);
             Assert.IsTrue(plain2Len == 4096);
-            for (int i = 0; i < 4096; i++)
-            {
+            for (int i = 0; i < 4096; i++) {
                 Assert.AreEqual(plain[i], plain2[i]);
             }
         }

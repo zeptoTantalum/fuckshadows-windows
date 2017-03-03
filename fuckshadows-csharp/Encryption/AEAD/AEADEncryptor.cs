@@ -132,9 +132,9 @@ namespace Fuckshadows.Encryption.AEAD
 
         public static void randBytes(byte[] buf, int length) { RNG.GetBytes(buf, length); }
 
-        protected abstract int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen);
+        public abstract int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen);
 
-        protected abstract int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen);
+        public abstract int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen);
 
         #region TCP
 
@@ -177,7 +177,7 @@ namespace Fuckshadows.Encryption.AEAD
             while (true) {
                 bufSize = _encCircularBuffer.Size;
                 if (bufSize <= 0) return;
-                int chunklength = Math.Min(CHUNK_LEN_MASK, bufSize);
+                int chunklength = bufSize & CHUNK_LEN_MASK;
                 byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
                 int encChunkLength;
                 byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
@@ -247,6 +247,7 @@ namespace Fuckshadows.Encryption.AEAD
                 Debug.Assert(decChunkLenLength == CHUNK_LEN_BYTES);
                 // finally we get the real chunk len
                 int chunkLen = IPAddress.NetworkToHostOrder((short)BitConverter.ToUInt16(decChunkLenBytes, 0));
+                chunkLen = chunkLen & CHUNK_LEN_MASK;
                 Logging.Debug("Get the real chunk len:" + chunkLen);
                 bufSize = _decCircularBuffer.Size;
                 if (bufSize < CHUNK_LEN_BYTES + tagLen /* we haven't remove them */+ chunkLen + tagLen) {
