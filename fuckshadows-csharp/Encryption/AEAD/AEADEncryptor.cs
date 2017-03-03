@@ -100,13 +100,13 @@ namespace Fuckshadows.Encryption.AEAD
 
         public void DeriveKey(byte[] password, byte[] key)
         {
-            int ret = Sodium.crypto_generichash(key, keyLen, password, (ulong) password.Length, IntPtr.Zero, 0);
+            int ret = Sodium.crypto_generichash(key, keyLen, password, (ulong) password.Length, null, 0);
             if (ret != 0) throw new System.Exception("failed to generate hash");
         }
 
         public void DeriveSessionKey(byte[] salt, byte[] masterKey, byte[] sessionKey)
         {
-            int ret = Sodium.crypto_generichash_blake2b_salt_personal(sessionKey, keyLen, IntPtr.Zero, 0, masterKey,
+            int ret = Sodium.crypto_generichash_blake2b_salt_personal(sessionKey, keyLen, null, 0, masterKey,
                                                                       keyLen, salt, PersonalBytes);
             if (ret != 0) throw new System.Exception("failed to generate session key");
         }

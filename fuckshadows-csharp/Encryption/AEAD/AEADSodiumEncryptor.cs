@@ -16,7 +16,7 @@ namespace Fuckshadows.Encryption.AEAD
         private const int CIPHER_CHACHA20IETFPOLY1305 = 2;
         private const int CIPHER_XCHACHA20IETFPOLY1305 = 3;
 
-        private byte[] _sodiumKey = null;
+        private byte[] _sodiumKey;
 
         public AEADSodiumEncryptor(string method, string password)
             : base(method, password) { }
@@ -40,9 +40,10 @@ namespace Fuckshadows.Encryption.AEAD
             }
             else
             {
+                _sodiumKey = new byte[keyLen];
                 DeriveSessionKey(isEncrypt ? _encryptSalt : _decryptSalt,
-                    _Masterkey, _sessionKey);
-                _sodiumKey = _sessionKey;
+                    _Masterkey, _sodiumKey);
+                //_sodiumKey = _sessionKey;
             }
             Logging.Dump("_sodiumKey", _sodiumKey, keyLen);
         }
@@ -60,15 +61,15 @@ namespace Fuckshadows.Encryption.AEAD
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_encrypt(ciphertext, ref encClen,
                                                                       plaintext, (ulong)plen,
-                                                                      IntPtr.Zero, 0,
-                                                                      IntPtr.Zero, _encNonce,
+                                                                      null, 0,
+                                                                      null, _encNonce,
                                                                       _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_encrypt(ciphertext, ref encClen,
                                                                            plaintext, (ulong)plen,
-                                                                           IntPtr.Zero, 0,
-                                                                           IntPtr.Zero, _encNonce,
+                                                                           null, 0,
+                                                                           null, _encNonce,
                                                                            _sodiumKey);
 
                     break;
@@ -93,16 +94,16 @@ namespace Fuckshadows.Encryption.AEAD
             switch (_cipher) {
                 case CIPHER_CHACHA20POLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_decrypt(plaintext, ref decPlen,
-                                                                      IntPtr.Zero,
+                                                                      null,
                                                                       ciphertext, (ulong)clen,
-                                                                      IntPtr.Zero, 0,
+                                                                      null, 0,
                                                                       _decNonce, _sodiumKey);
                     break;
                 case CIPHER_CHACHA20IETFPOLY1305:
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_decrypt(plaintext, ref decPlen,
-                                                                           IntPtr.Zero,
+                                                                           null,
                                                                            ciphertext, (ulong)clen,
-                                                                           IntPtr.Zero, 0,
+                                                                           null, 0,
                                                                            _decNonce, _sodiumKey);
                     break;
                 default:

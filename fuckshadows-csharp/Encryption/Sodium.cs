@@ -58,28 +58,28 @@ namespace Fuckshadows.Encryption
         public static extern int sodium_increment(byte[] n, int nlen);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int crypto_generichash(byte[] outbuf, int outlen, byte[] inbuf, ulong inlen, IntPtr key,
+        public static extern int crypto_generichash(byte[] outbuf, int outlen, byte[] inbuf, ulong inlen, byte[] key,
             int keylen);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int crypto_generichash_blake2b_salt_personal(byte[] outArr, int outlen, IntPtr inArr,
+        public static extern int crypto_generichash_blake2b_salt_personal(byte[] outArr, int outlen, byte[] inArr,
             ulong inlen, byte[] key, int keylen, byte[] salt, byte[] personal);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
         public static extern int crypto_aead_chacha20poly1305_ietf_encrypt(byte[] c, ref ulong clen_p, byte[] m,
-            ulong mlen, IntPtr ad, ulong adlen, IntPtr nsec, byte[] npub, byte[] k);
+            ulong mlen, byte[] ad, ulong adlen, byte[] nsec, byte[] npub, byte[] k);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
         public static extern int crypto_aead_chacha20poly1305_ietf_decrypt(byte[] m, ref ulong mlen_p,
-            IntPtr nsec, byte[] c, ulong clen, IntPtr ad, ulong adlen, byte[] npub, byte[] k);
+            byte[] nsec, byte[] c, ulong clen, byte[] ad, ulong adlen, byte[] npub, byte[] k);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
         public static extern int crypto_aead_chacha20poly1305_encrypt(byte[] c, ref ulong clen_p, byte[] m, ulong mlen,
-            IntPtr ad, ulong adlen, IntPtr nsec, byte[] npub, byte[] k);
+            byte[] ad, ulong adlen, byte[] nsec, byte[] npub, byte[] k);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
-        public static extern int crypto_aead_chacha20poly1305_decrypt(byte[] m, ref ulong mlen_p, IntPtr nsec, byte[] c,
-            ulong clen, IntPtr ad, ulong adlen, byte[] npub, byte[] k);
+        public static extern int crypto_aead_chacha20poly1305_decrypt(byte[] m, ref ulong mlen_p, byte[] nsec, byte[] c,
+            ulong clen, byte[] ad, ulong adlen, byte[] npub, byte[] k);
 
         #endregion
 
