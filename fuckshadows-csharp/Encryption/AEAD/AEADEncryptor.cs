@@ -177,7 +177,7 @@ namespace Fuckshadows.Encryption.AEAD
             while (true) {
                 bufSize = _encCircularBuffer.Size;
                 if (bufSize <= 0) return;
-                int chunklength = Math.Min(bufSize, CHUNK_LEN_MASK - 1);
+                int chunklength = Math.Min(bufSize, CHUNK_LEN_MASK);
                 byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
                 int encChunkLength;
                 byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
@@ -247,7 +247,7 @@ namespace Fuckshadows.Encryption.AEAD
                 Debug.Assert(decChunkLenLength == CHUNK_LEN_BYTES);
                 // finally we get the real chunk len
                 int chunkLen = IPAddress.NetworkToHostOrder((short)BitConverter.ToUInt16(decChunkLenBytes, 0));
-                if (chunkLen >= CHUNK_LEN_MASK)
+                if (chunkLen > CHUNK_LEN_MASK)
                 {
                     // we get invalid chunk
                     Logging.Error($"Invalid chunk length: {chunkLen}");
