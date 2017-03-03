@@ -177,7 +177,7 @@ namespace Fuckshadows.Encryption.AEAD
             while (true) {
                 bufSize = _encCircularBuffer.Size;
                 if (bufSize <= 0) return;
-                int chunklength = bufSize & CHUNK_LEN_MASK;
+                int chunklength = Math.Min(bufSize, CHUNK_LEN_MASK - 1);
                 byte[] chunkBytes = _encCircularBuffer.Get(chunklength);
                 int encChunkLength;
                 byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
@@ -187,7 +187,7 @@ namespace Fuckshadows.Encryption.AEAD
                 outlength += encChunkLength;
                 Logging.Debug("chunks enc outlength " + outlength);
                 // check if we have enough space for outbuf
-                if (outlength + TCPHandler.ChunkOverheadSize > TCPHandler.RecvSize) {
+                if (outlength + TCPHandler.ChunkOverheadSize > TCPHandler.BufferSize) {
                     Logging.Debug("enc outbuf almost full, giving up");
                     return;
                 }
@@ -247,7 +247,12 @@ namespace Fuckshadows.Encryption.AEAD
                 Debug.Assert(decChunkLenLength == CHUNK_LEN_BYTES);
                 // finally we get the real chunk len
                 int chunkLen = IPAddress.NetworkToHostOrder((short)BitConverter.ToUInt16(decChunkLenBytes, 0));
-                chunkLen = chunkLen & CHUNK_LEN_MASK;
+                if (chunkLen >= CHUNK_LEN_MASK)
+                {
+                    // we get invalid chunk
+                    Logging.Error($"Invalid chunk length: {chunkLen}");
+                    throw new CryptoErrorException();
+                }
                 Logging.Debug("Get the real chunk len:" + chunkLen);
                 bufSize = _decCircularBuffer.Size;
                 if (bufSize < CHUNK_LEN_BYTES + tagLen /* we haven't remove them */+ chunkLen + tagLen) {
@@ -272,6 +277,11 @@ namespace Fuckshadows.Encryption.AEAD
                 Buffer.BlockCopy(decChunkBytes, 0, outbuf, outlength, decChunkLen);
                 outlength += decChunkLen;
                 Logging.Debug("aead dec outlength " + outlength);
+                if (outlength + 100 > TCPHandler.BufferSize)
+                {
+                    Logging.Debug("dec outbuf almost full, giving up");
+                    return;
+                }
                 bufSize = _decCircularBuffer.Size;
                 // check if we already done all of them
                 if (bufSize <= 0) {

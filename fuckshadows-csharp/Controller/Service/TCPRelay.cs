@@ -133,8 +133,11 @@ namespace Fuckshadows.Controller
         // overhead of one chunk, reserved for AEAD ciphers
         public const int ChunkOverheadSize = 16 * 2 /* two tags */ + AEADEncryptor.CHUNK_LEN_BYTES;
 
+        // max chunk size
+        public const int MaxChunkSize = AEADEncryptor.CHUNK_LEN_MASK + AEADEncryptor.CHUNK_LEN_BYTES + 16 * 2;
+
         // In general, the ciphertext length, we should take overhead into account
-        public const int BufferSize = RecvSize + ChunkOverheadSize + 32 /* max salt len */ + 123 /* a random number */;
+        public const int BufferSize = RecvSize + MaxChunkSize + 32 /* max salt len */ + 123 /* a random number */;
 
         public DateTime lastActivity;
 
@@ -167,9 +170,9 @@ namespace Fuckshadows.Controller
         // remote -> local proxy (ciphertext, before decrypt)
         private byte[] _remoteRecvBuffer = new byte[BufferSize];
         // client -> local proxy (plaintext, before encrypt)
-        private byte[] _connetionRecvBuffer = new byte[RecvSize];
+        private byte[] _connetionRecvBuffer = new byte[BufferSize];
         // local proxy -> remote (plaintext, after decrypt)
-        private byte[] _remoteSendBuffer = new byte[RecvSize];
+        private byte[] _remoteSendBuffer = new byte[BufferSize];
         // local proxy -> client (ciphertext, before decrypt)
         private byte[] _connetionSendBuffer = new byte[BufferSize];
 
