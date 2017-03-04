@@ -9,17 +9,25 @@ namespace Fuckshadows.Encryption
 {
     public static class Sodium
     {
-        const string DLLNAME = "libfscrypto";
+#if _X64
+        private const string DLLNAME = "libfscrypto64.dll";
+#else
+        private const string DLLNAME = "libfscrypto.dll";
+#endif
 
         private static bool _initialized = false;
         private static readonly object _initLock = new object();
 
         static Sodium()
         {
-            string dllPath = Utils.GetTempPath("libfscrypto.dll");
+            string dllPath = Utils.GetTempPath(DLLNAME);
             try
             {
+#if _X64
+                FileManager.UncompressFile(dllPath, Resources.libfscrypto64_dll);
+#else
                 FileManager.UncompressFile(dllPath, Resources.libfscrypto_dll);
+#endif
             }
             catch (IOException)
             {
@@ -30,7 +38,8 @@ namespace Fuckshadows.Encryption
             }
             LoadLibrary(dllPath);
 
-            lock (_initLock) {
+            lock (_initLock)
+            {
                 if (!_initialized)
                 {
                     int ret = sodium_init();

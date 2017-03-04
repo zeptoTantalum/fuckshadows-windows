@@ -9,17 +9,25 @@ namespace Fuckshadows.Encryption
 {
     public class MbedTLS
     {
-        const string DLLNAME = "libfscrypto";
+#if _X64
+        private const string DLLNAME = "libfscrypto64.dll";
+#else
+        private const string DLLNAME = "libfscrypto.dll";
+#endif
 
         public const int MBEDTLS_ENCRYPT = 1;
         public const int MBEDTLS_DECRYPT = 0;
 
         static MbedTLS()
         {
-            string dllPath = Utils.GetTempPath("libfscrypto.dll");
+            string dllPath = Utils.GetTempPath(DLLNAME);
             try
             {
+#if _X64
+                FileManager.UncompressFile(dllPath, Resources.libfscrypto64_dll);
+#else
                 FileManager.UncompressFile(dllPath, Resources.libfscrypto_dll);
+#endif
             }
             catch (IOException)
             {
