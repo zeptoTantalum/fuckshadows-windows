@@ -87,7 +87,7 @@ namespace Fuckshadows.Encryption.AEAD
                     Debug.Assert(olen == plen);
                     // attach tag to ciphertext
                     Buffer.BlockCopy(tagbuf, 0, ciphertext, plen, tagLen);
-                    clen = plen + tagLen;
+                    clen = olen + tagLen;
                     return ret;
                 default:
                     throw new System.Exception("not implemented");
@@ -113,7 +113,7 @@ namespace Fuckshadows.Encryption.AEAD
                                                       tagbuf, tagLen);
                     if (ret != 0) throw new CryptoErrorException();
                     Debug.Assert(olen == clen - tagLen);
-                    plen = clen - tagLen;
+                    plen = olen;
                     return ret;
                 default:
                     throw new System.Exception("not implemented");

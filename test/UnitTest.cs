@@ -241,7 +241,7 @@ namespace test
             Assert.IsFalse(encryptionFailed);
         }
 
-        public void RunSingleAEADMbedTLSEncryptionThread()
+        private void RunSingleAEADMbedTLSEncryptionThread()
         {
             try
             {
@@ -335,7 +335,7 @@ namespace test
             }
         }
 
-
+        [Test]
         public void TestAEADSodiumEncryption()
         {
             List<Thread> threads = new List<Thread>();
@@ -352,21 +352,20 @@ namespace test
             Assert.IsFalse(encryptionFailed);
         }
 
-        [Test]
-        public void RunSingleAEADSodiumEncryptionThread()
+        private void RunSingleAEADSodiumEncryptionThread()
         {
             try
             {
                 byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
                 int abufLen = abufBytes.Length;
-                //for (int i = 0; i < 100; i++)
-                //{
-                IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-poly1305", "barfoo!");
-                IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-poly1305", "barfoo!");
-                Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
-                encryptor.AddrBufLength = abufLen;
-                RunAEADEncryptionRound(encryptor, decryptor);
-                //}
+                for (int i = 0; i < 100; i++)
+                {
+                    IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-poly1305", "barfoo!");
+                    IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-poly1305", "barfoo!");
+                    Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
+                    encryptor.AddrBufLength = abufLen;
+                    RunAEADEncryptionRound(encryptor, decryptor);
+                }
             }
             catch
             {

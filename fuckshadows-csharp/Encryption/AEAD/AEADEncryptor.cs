@@ -144,6 +144,7 @@ namespace Fuckshadows.Encryption.AEAD
 
             _encCircularBuffer.Put(buf, 0, length);
             outlength = 0;
+            Logging.Debug("---Start Encryption");
             if (! _encryptSaltSent) {
                 _encryptSaltSent = true;
                 // Generate salt
@@ -152,6 +153,7 @@ namespace Fuckshadows.Encryption.AEAD
                 InitCipher(saltBytes, true, false);
                 Buffer.BlockCopy(saltBytes, 0, outbuf, 0, saltLen);
                 outlength = saltLen;
+                Logging.Debug($"_encryptSaltSent outlength {outlength}");
             }
 
             if (! _tcpRequestSent) {
@@ -161,13 +163,11 @@ namespace Fuckshadows.Encryption.AEAD
                 byte[] encAddrBufBytes = new byte[AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES];
                 byte[] addrBytes = new byte[AddrBufLength];
                 Buffer.BlockCopy(AddrBufBytes, 0, addrBytes, 0, AddrBufLength);
-
                 ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
                 Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
-                Logging.Debug("_tcpRequestSent outlength " + outlength);
                 Buffer.BlockCopy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
-
                 outlength += encAddrBufLength;
+                Logging.Debug($"_tcpRequestSent outlength {outlength}");
                 // skip address buffer
                 _encCircularBuffer.Get(AddrBufLength);
             }
@@ -204,11 +204,11 @@ namespace Fuckshadows.Encryption.AEAD
         {
             Debug.Assert(_decCircularBuffer != null, "_decCircularBuffer != null");
             int bufSize;
-
             outlength = 0;
             // drop all into buffer
-
             _decCircularBuffer.Put(buf, 0, length);
+
+            Logging.Debug("---Start Decryption");
             if (! _decryptSaltReceived) {
                 bufSize = _decCircularBuffer.Size;
                 // check if we get the leading salt
@@ -328,7 +328,8 @@ namespace Fuckshadows.Encryption.AEAD
         private void ChunkEncrypt(byte[] plaintext, int plainLen, byte[] ciphertext, out int cipherLen)
         {
             if (plainLen > CHUNK_LEN_MASK) {
-                throw new CryptoErrorException("chunk too big");
+                Logging.Error("enc chunk too big");
+                throw new CryptoErrorException();
             }
 
             // encrypt len
