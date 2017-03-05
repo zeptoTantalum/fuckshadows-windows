@@ -88,19 +88,19 @@ namespace Fuckshadows.Encryption
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
         public static extern int cipher_auth_encrypt(IntPtr ctx,
-            byte[] iv, int iv_len,
-            IntPtr ad, int ad_len,
-            byte[] input, int ilen,
-            byte[] output, ref int olen,
-            byte[] tag, int tag_len);
+            byte[] iv, uint iv_len,
+            IntPtr ad, uint ad_len,
+            byte[] input, uint ilen,
+            byte[] output, ref uint olen,
+            byte[] tag, uint tag_len);
 
         [DllImport(DLLNAME, CallingConvention = CallingConvention.Cdecl)]
         public static extern int cipher_auth_decrypt(IntPtr ctx,
-            byte[] iv, int iv_len,
-            IntPtr ad, int ad_len,
-            byte[] input, int ilen,
-            byte[] output, ref int olen,
-            byte[] tag, int tag_len);
+            byte[] iv, uint iv_len,
+            IntPtr ad, uint ad_len,
+            byte[] input, uint ilen,
+            byte[] output, ref uint olen,
+            byte[] tag, uint tag_len);
 
         #endregion
     }

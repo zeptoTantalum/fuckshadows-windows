@@ -335,7 +335,7 @@ namespace test
             }
         }
 
-        //[Test]
+        [Test]
         public void TestAEADSodiumEncryption()
         {
             List<Thread> threads = new List<Thread>();

@@ -64,53 +64,53 @@ namespace Fuckshadows.Encryption.AEAD
             if (ret != 0) throw new System.Exception("failed to finish preparation");
         }
 
-        public override int cipherEncrypt(byte[] plaintext, int plen, byte[] ciphertext, ref int clen)
+        public override int cipherEncrypt(byte[] plaintext, uint plen, byte[] ciphertext, ref uint clen)
         {
             // buf: all plaintext
             // outbuf: ciphertext + tag
             int ret;
             byte[] tagbuf = new byte[tagLen];
-            int olen = 0;
+            uint olen = 0;
             switch (_cipher) {
                 case CIPHER_AES:
                     ret = MbedTLS.cipher_auth_encrypt(_encryptCtx,
                                                       /* nonce */
-                                                      _encNonce, nonceLen,
+                                                      _encNonce, (uint)nonceLen,
                                                       /* AD */
                                                       IntPtr.Zero, 0,
                                                       /* plain */
                                                       plaintext, plen,
                                                       /* cipher */
                                                       ciphertext, ref olen,
-                                                      tagbuf, tagLen);
+                                                      tagbuf, (uint)tagLen);
                     if (ret != 0) throw new CryptoErrorException();
                     Debug.Assert(olen == plen);
                     // attach tag to ciphertext
-                    Buffer.BlockCopy(tagbuf, 0, ciphertext, plen, tagLen);
-                    clen = olen + tagLen;
+                    Buffer.BlockCopy(tagbuf, 0, ciphertext, (int) plen, tagLen);
+                    clen = olen + (uint)tagLen;
                     return ret;
                 default:
                     throw new System.Exception("not implemented");
             }
         }
 
-        public override int cipherDecrypt(byte[] ciphertext, int clen, byte[] plaintext, ref int plen)
+        public override int cipherDecrypt(byte[] ciphertext, uint clen, byte[] plaintext, ref uint plen)
         {
             // buf: ciphertext + tag
             // outbuf: plaintext
             int ret;
-            int olen = 0;
+            uint olen = 0;
             // split tag
             byte[] tagbuf = new byte[tagLen];
-            Buffer.BlockCopy(ciphertext, clen - tagLen, tagbuf, 0, tagLen);
+            Buffer.BlockCopy(ciphertext, (int) (clen - tagLen), tagbuf, 0, tagLen);
             switch (_cipher) {
                 case CIPHER_AES:
                     ret = MbedTLS.cipher_auth_decrypt(_decryptCtx,
-                                                      _decNonce, nonceLen,
+                                                      _decNonce, (uint) nonceLen,
                                                       IntPtr.Zero, 0,
-                                                      ciphertext, clen - tagLen,
+                                                      ciphertext, (uint) (clen - tagLen),
                                                       plaintext, ref olen,
-                                                      tagbuf, tagLen);
+                                                      tagbuf, (uint) tagLen);
                     if (ret != 0) throw new CryptoErrorException();
                     Debug.Assert(olen == clen - tagLen);
                     plen = olen;
