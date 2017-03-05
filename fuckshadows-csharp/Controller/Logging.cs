@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Net;
 using System.Diagnostics;
+using System.Text;
 using Fuckshadows.Util;
 
 namespace Fuckshadows.Controller
@@ -72,13 +73,13 @@ namespace Fuckshadows.Controller
         [Conditional("DEBUG")]
         public static void Dump(string tag, byte[] arr, int length)
         {
-            string str = $"{Environment.NewLine}{tag}: ";
+            var sb = new StringBuilder($"{Environment.NewLine}{tag}: ");
             for (int i = 0; i < length - 1; i++) {
-                str += $"0x{arr[i]:X2}, ";
+                sb.Append($"0x{arr[i]:X2}, ");
             }
-            str += $"0x{arr[length-1]:X2}";
-            str += Environment.NewLine;
-            Debug(str);
+            sb.Append($"0x{arr[length - 1]:X2}");
+            sb.Append(Environment.NewLine);
+            Debug(sb.ToString());
         }
 
         [Conditional("DEBUG")]
