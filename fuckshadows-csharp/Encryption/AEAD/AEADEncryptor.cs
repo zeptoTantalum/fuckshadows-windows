@@ -160,15 +160,12 @@ namespace Fuckshadows.Encryption.AEAD
                 // The first TCP request
                 int encAddrBufLength;
                 byte[] encAddrBufBytes = new byte[AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES];
-                byte[] addrBytes = new byte[AddrBufLength];
-                Buffer.BlockCopy(AddrBufBytes, 0, addrBytes, 0, AddrBufLength);
+                byte[] addrBytes = _encCircularBuffer.Get(AddrBufLength);
                 ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
                 Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
                 Buffer.BlockCopy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
                 outlength += encAddrBufLength;
                 Logging.Debug($"_tcpRequestSent outlength {outlength}");
-                // skip address buffer
-                _encCircularBuffer.Get(AddrBufLength);
             }
 
             uint bufSize;

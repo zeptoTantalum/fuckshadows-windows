@@ -161,7 +161,6 @@ namespace Fuckshadows.Controller
         private const int CMD_CONNECT = 0x01;
         private const int CMD_UDP_ASSOC = 0x03;
 
-        private byte[] _addrBufBytes = new byte[ADDR_ATYP_LEN + 1 + MAX_DOMAIN_LEN + ADDR_PORT_LEN];
         private int _addrBufLength = - 1;
 
         private int _totalRead = 0;
@@ -217,7 +216,6 @@ namespace Fuckshadows.Controller
             /* prepare address buffer for AEAD */
             Logging.Debug($"_addrBufLength={_addrBufLength}");
             _encryptor.AddrBufLength = _addrBufLength;
-            Buffer.BlockCopy(_addrBufBytes, 0, _encryptor.AddrBufBytes, 0, _addrBufLength);
         }
 
         public void Start(byte[] firstPacket, int length)
@@ -461,9 +459,6 @@ namespace Fuckshadows.Controller
                             _addrBufLength = ADDR_ATYP_LEN + 16 + ADDR_PORT_LEN;
                             break;
                     }
-
-                    /* prepare address buffer for AEAD */
-                    Buffer.BlockCopy(_connetionRecvBuffer, 0, _addrBufBytes, 0, _addrBufLength);
 
                     if (_config.isVerboseLogging)
                     {

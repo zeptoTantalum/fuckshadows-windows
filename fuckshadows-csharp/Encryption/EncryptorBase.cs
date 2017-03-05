@@ -93,7 +93,5 @@ namespace Fuckshadows.Encryption
         public abstract void Dispose();
 
         public int AddrBufLength { get; set; } = - 1;
-
-        public byte[] AddrBufBytes { get; set; } = new byte[ADDR_ATYP_LEN + 1 + MAX_DOMAIN_LEN + ADDR_PORT_LEN];
     }
 }

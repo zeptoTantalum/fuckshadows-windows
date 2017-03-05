@@ -46,6 +46,8 @@ namespace test
 
         private Random _random = null;
         private static bool encryptionFailed = false;
+        private static byte[] abufBytes = { 3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187 };
+        private static int abufLength = abufBytes.Length;
 
         #endregion
 
@@ -84,7 +86,6 @@ namespace test
 
         private void RunAEADEncryptionRound(IEncryptor encryptor, IEncryptor decryptor)
         {
-            byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
             byte[] plain = new byte[16384];
             const int Salt = 32;
             // make the cipher array large enough to hold chunks
@@ -95,7 +96,7 @@ namespace test
 
             _random.NextBytes(plain);
             // make sure we have initialized the address buffer
-            Buffer.BlockCopy(abufBytes, 0, plain, 0, abufBytes.Length);
+            Buffer.BlockCopy(abufBytes, 0, plain, 0, abufLength);
             encryptor.Encrypt(plain, plain.Length, cipher, out outLen);
             decryptor.Decrypt(cipher, outLen, plain2, out outLen2);
             Assert.AreEqual(plain.Length, outLen2);
@@ -245,14 +246,11 @@ namespace test
         {
             try
             {
-                byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
-                int abufLen = abufBytes.Length;
                 for (int i = 0; i < 100; i++)
                 {
                     IEncryptor encryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
                     IEncryptor decryptor = new AEADMbedTLSEncryptor("aes-256-gcm", "barfoo!");
-                    Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
-                    encryptor.AddrBufLength = abufLen;
+                    encryptor.AddrBufLength = abufLength;
                     RunAEADEncryptionRound(encryptor, decryptor);
                 }
             }
@@ -356,14 +354,11 @@ namespace test
         {
             try
             {
-                byte[] abufBytes = {3, 14, 119, 119, 119, 46, 103, 111, 111, 103, 108, 101, 46, 99, 111, 109, 1, 187};
-                int abufLen = abufBytes.Length;
                 for (int i = 0; i < 100; i++)
                 {
                     IEncryptor encryptor = new AEADSodiumEncryptor("chacha20-poly1305", "barfoo!");
                     IEncryptor decryptor = new AEADSodiumEncryptor("chacha20-poly1305", "barfoo!");
-                    Buffer.BlockCopy(abufBytes, 0, encryptor.AddrBufBytes, 0, abufLen);
-                    encryptor.AddrBufLength = abufLen;
+                    encryptor.AddrBufLength = abufLength;
                     RunAEADEncryptionRound(encryptor, decryptor);
                 }
             }
