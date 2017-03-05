@@ -95,7 +95,6 @@ namespace Fuckshadows.Encryption.AEAD
             DeriveKey(passbuf, _Masterkey);
             // init session key
             if (_sessionKey == null) _sessionKey = new byte[keyLen];
-            if (_sessionKey.Length < keyLen) Array.Resize(ref _sessionKey, keyLen);
         }
 
         public void DeriveKey(byte[] password, byte[] key)
