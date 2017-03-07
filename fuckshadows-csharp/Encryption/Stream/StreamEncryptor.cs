@@ -4,9 +4,10 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
 using System.Net;
-using Cyotek.Collections.Generic;
+using Fuckshadows.Encryption.CircularBuffer;
 using Fuckshadows.Controller;
 using Fuckshadows.Encryption.Exception;
+using static Fuckshadows.Util.Utils;
 
 namespace Fuckshadows.Encryption.Stream
 {
@@ -18,8 +19,8 @@ namespace Fuckshadows.Encryption.Stream
 
         // every connection should create its own buffer
 
-        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(TCPHandler.BufferSize * 2, false);
-        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(TCPHandler.BufferSize * 2, false);
+        private ByteCircularBuffer _encCircularBuffer = new ByteCircularBuffer(TCPHandler.BufferSize * 2);
+        private ByteCircularBuffer _decCircularBuffer = new ByteCircularBuffer(TCPHandler.BufferSize * 2);
         protected Dictionary<string, EncryptorInfo> ciphers;
 
         protected byte[] _encryptIV;
@@ -117,7 +118,7 @@ namespace Fuckshadows.Encryption.Stream
                 randBytes(ivBytes, ivLen);
                 initCipher(ivBytes, true);
                 
-                Buffer.BlockCopy(ivBytes, 0, outbuf, 0, ivLen);
+                Array.Copy(ivBytes, 0, outbuf, 0, ivLen);
                 cipherOffset = ivLen;
                 _encryptIVSent = true;
             }
@@ -125,7 +126,7 @@ namespace Fuckshadows.Encryption.Stream
             byte[] plain = _encCircularBuffer.Get(size);
             byte[] cipher = new byte[size];
             cipherUpdate(true, size, plain, cipher);
-            Buffer.BlockCopy(cipher, 0, outbuf, cipherOffset, size);
+            PerfByteCopy(cipher, 0, outbuf, cipherOffset, size);
             outlength = size + cipherOffset;
         }
 
@@ -163,7 +164,7 @@ namespace Fuckshadows.Encryption.Stream
             lock (_udpTmpBuf) {
                 cipherUpdate(true, length, buf, _udpTmpBuf);
                 outlength = length + ivLen;
-                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, ivLen, length);
+                PerfByteCopy(_udpTmpBuf, 0, outbuf, ivLen, length);
             }
         }
 
@@ -174,7 +175,7 @@ namespace Fuckshadows.Encryption.Stream
             outlength = length - ivLen;
             lock (_udpTmpBuf) {
                 // C# could be multi-threaded
-                Buffer.BlockCopy(buf, ivLen, _udpTmpBuf, 0, length - ivLen);
+                PerfByteCopy(buf, ivLen, _udpTmpBuf, 0, length - ivLen);
                 cipherUpdate(false, length - ivLen, _udpTmpBuf, outbuf);
             }
         }

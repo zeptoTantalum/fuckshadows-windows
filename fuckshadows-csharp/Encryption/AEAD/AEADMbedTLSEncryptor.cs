@@ -86,7 +86,7 @@ namespace Fuckshadows.Encryption.AEAD
                     if (ret != 0) throw new CryptoErrorException();
                     Debug.Assert(olen == plen);
                     // attach tag to ciphertext
-                    Buffer.BlockCopy(tagbuf, 0, ciphertext, (int) plen, tagLen);
+                    Array.Copy(tagbuf, 0, ciphertext, (int) plen, tagLen);
                     clen = olen + (uint)tagLen;
                     return ret;
                 default:
@@ -102,7 +102,7 @@ namespace Fuckshadows.Encryption.AEAD
             uint olen = 0;
             // split tag
             byte[] tagbuf = new byte[tagLen];
-            Buffer.BlockCopy(ciphertext, (int) (clen - tagLen), tagbuf, 0, tagLen);
+            Array.Copy(ciphertext, (int) (clen - tagLen), tagbuf, 0, tagLen);
             switch (_cipher) {
                 case CIPHER_AES:
                     ret = MbedTLS.cipher_auth_decrypt(_decryptCtx,

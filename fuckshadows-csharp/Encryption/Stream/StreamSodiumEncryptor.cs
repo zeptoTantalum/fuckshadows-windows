@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Fuckshadows.Encryption.Exception;
+using static Fuckshadows.Util.Utils;
 
 namespace Fuckshadows.Encryption.Stream
 {
@@ -67,7 +68,7 @@ namespace Fuckshadows.Encryption.Stream
                 iv = _decryptIV;
             }
             int padding = bytesRemaining;
-            Buffer.BlockCopy(buf, 0, sodiumBuf, padding, length);
+            PerfByteCopy(buf, 0, sodiumBuf, padding, length);
 
             switch (_cipher)
             {
@@ -83,7 +84,7 @@ namespace Fuckshadows.Encryption.Stream
             }
             if (ret != 0) throw new CryptoErrorException();
 
-            Buffer.BlockCopy(sodiumBuf, padding, outbuf, 0, length);
+            PerfByteCopy(sodiumBuf, padding, outbuf, 0, length);
             padding += length;
             ic += (ulong)padding / SODIUM_BLOCK_SIZE;
             bytesRemaining = padding % SODIUM_BLOCK_SIZE;

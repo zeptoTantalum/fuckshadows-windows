@@ -6,10 +6,11 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Cyotek.Collections.Generic;
+using Fuckshadows.Encryption.CircularBuffer;
 using Fuckshadows.Controller;
 using Fuckshadows.Encryption;
 using Fuckshadows.Encryption.Exception;
+using static Fuckshadows.Util.Utils;
 
 namespace Fuckshadows.Encryption.AEAD
 {
@@ -24,8 +25,8 @@ namespace Fuckshadows.Encryption.AEAD
         protected static byte[] _udpTmpBuf = new byte[MAX_INPUT_SIZE];
 
         // every connection should create its own buffer
-        private CircularBuffer<byte> _encCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
-        private CircularBuffer<byte> _decCircularBuffer = new CircularBuffer<byte>(MAX_INPUT_SIZE * 2, false);
+        private ByteCircularBuffer _encCircularBuffer = new ByteCircularBuffer(MAX_INPUT_SIZE * 2);
+        private ByteCircularBuffer _decCircularBuffer = new ByteCircularBuffer(MAX_INPUT_SIZE * 2);
 
         public const int CHUNK_LEN_BYTES = 2;
         public const uint CHUNK_LEN_MASK = 0x3FFFu;
@@ -150,7 +151,7 @@ namespace Fuckshadows.Encryption.AEAD
                 byte[] saltBytes = new byte[saltLen];
                 randBytes(saltBytes, saltLen);
                 InitCipher(saltBytes, true, false);
-                Buffer.BlockCopy(saltBytes, 0, outbuf, 0, saltLen);
+                Array.Copy(saltBytes, 0, outbuf, 0, saltLen);
                 outlength = saltLen;
                 Logging.Debug($"_encryptSaltSent outlength {outlength}");
             }
@@ -163,7 +164,7 @@ namespace Fuckshadows.Encryption.AEAD
                 byte[] addrBytes = _encCircularBuffer.Get(AddrBufLength);
                 ChunkEncrypt(addrBytes, AddrBufLength, encAddrBufBytes, out encAddrBufLength);
                 Debug.Assert(encAddrBufLength == AddrBufLength + tagLen * 2 + CHUNK_LEN_BYTES);
-                Buffer.BlockCopy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
+                Array.Copy(encAddrBufBytes, 0, outbuf, outlength, encAddrBufLength);
                 outlength += encAddrBufLength;
                 Logging.Debug($"_tcpRequestSent outlength {outlength}");
             }
@@ -179,7 +180,7 @@ namespace Fuckshadows.Encryption.AEAD
                 byte[] encChunkBytes = new byte[chunklength + tagLen * 2 + CHUNK_LEN_BYTES];
                 ChunkEncrypt(chunkBytes, chunklength, encChunkBytes, out encChunkLength);
                 Debug.Assert(encChunkLength == chunklength + tagLen * 2 + CHUNK_LEN_BYTES);
-                Buffer.BlockCopy(encChunkBytes, 0, outbuf, outlength, encChunkLength);
+                PerfByteCopy(encChunkBytes, 0, outbuf, outlength, encChunkLength);
                 outlength += encChunkLength;
                 Logging.Debug("chunks enc outlength " + outlength);
                 // check if we have enough space for outbuf
@@ -259,7 +260,7 @@ namespace Fuckshadows.Encryption.AEAD
 
                 // we have enough data to decrypt one chunk
                 // drop chunk len and its tag from buffer
-                _decCircularBuffer.Get(CHUNK_LEN_BYTES + tagLen);
+                _decCircularBuffer.Skip(CHUNK_LEN_BYTES + tagLen);
                 byte[] encChunkBytes = _decCircularBuffer.Get(chunkLen + tagLen);
                 byte[] decChunkBytes = new byte[chunkLen];
                 uint decChunkLen = 0;
@@ -270,7 +271,7 @@ namespace Fuckshadows.Encryption.AEAD
                 #endregion
 
                 // output to outbuf
-                Buffer.BlockCopy(decChunkBytes, 0, outbuf, outlength, (int) decChunkLen);
+                PerfByteCopy(decChunkBytes, 0, outbuf, outlength, (int) decChunkLen);
                 outlength += (int)decChunkLen;
                 Logging.Debug("aead dec outlength " + outlength);
                 if (outlength + 100 > TCPHandler.BufferSize)
@@ -300,7 +301,7 @@ namespace Fuckshadows.Encryption.AEAD
             lock (_udpTmpBuf) {
                 cipherEncrypt(buf, (uint) length, _udpTmpBuf, ref olen);
                 Debug.Assert(olen == length + tagLen);
-                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, saltLen, (int) olen);
+                PerfByteCopy(_udpTmpBuf, 0, outbuf, saltLen, (int) olen);
                 outlength = (int) (saltLen + olen);
             }
         }
@@ -313,7 +314,7 @@ namespace Fuckshadows.Encryption.AEAD
                 // copy remaining data to first pos
                 Buffer.BlockCopy(buf, saltLen, buf, 0, length - saltLen);
                 cipherDecrypt(buf, (uint) (length - saltLen), _udpTmpBuf, ref olen);
-                Buffer.BlockCopy(_udpTmpBuf, 0, outbuf, 0, (int) olen);
+                PerfByteCopy(_udpTmpBuf, 0, outbuf, 0, (int) olen);
                 outlength = (int) olen;
             }
         }
@@ -344,8 +345,8 @@ namespace Fuckshadows.Encryption.AEAD
             IncrementNonce(true);
 
             // construct outbuf
-            Buffer.BlockCopy(encLenBytes, 0, ciphertext, 0, (int) encChunkLenLength);
-            Buffer.BlockCopy(encBytes, 0, ciphertext, (int) encChunkLenLength, (int) encBufLength);
+            Array.Copy(encLenBytes, 0, ciphertext, 0, (int) encChunkLenLength);
+            PerfByteCopy(encBytes, 0, ciphertext, (int) encChunkLenLength, (int) encBufLength);
             cipherLen = (int) (encChunkLenLength + encBufLength);
         }
     }

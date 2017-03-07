@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Fuckshadows.Controller;
@@ -211,5 +212,33 @@ namespace Fuckshadows.Util
             }
             return false;
         }
+
+        #region BufferBlockCopy Wrapper
+
+        private const int BufferBlockCopyThreshold = 1024;
+
+        /// <summary>
+        /// Copy bytes effectively, if you are sure length is less than or equal to
+        /// BufferBlockCopyThreshold, use the corresponding method directly
+        /// </summary>
+        /// <param name="src"></param>
+        /// <param name="srcOff"></param>
+        /// <param name="dst"></param>
+        /// <param name="dstOff"></param>
+        /// <param name="length"></param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void PerfByteCopy(byte[] src, int srcOff, byte[] dst, int dstOff, int length)
+        {
+            if (length >= BufferBlockCopyThreshold)
+            {
+                Buffer.BlockCopy(src, srcOff, dst, dstOff, length);
+            }
+            else
+            {
+                Array.Copy(src, srcOff, dst, dstOff, length);
+            }
+        }
+
+        #endregion
     }
 }
