@@ -92,7 +92,13 @@ namespace Fuckshadows.Encryption.AEAD
                         null, 0,
                         null, _encNonce,
                         _sodiumEncSubkey);
-
+                    break;
+                case CIPHER_XCHACHA20IETFPOLY1305:
+                    ret = Sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(ciphertext, ref encClen,
+                        plaintext, (ulong)plen,
+                        null, 0,
+                        null, _encNonce,
+                        _sodiumEncSubkey);
                     break;
                 default:
                     throw new System.Exception("not implemented");
@@ -126,6 +132,13 @@ namespace Fuckshadows.Encryption.AEAD
                     ret = Sodium.crypto_aead_chacha20poly1305_ietf_decrypt(plaintext, ref decPlen,
                         null,
                         ciphertext, (ulong) clen,
+                        null, 0,
+                        _decNonce, _sodiumDecSubkey);
+                    break;
+                case CIPHER_XCHACHA20IETFPOLY1305:
+                    ret = Sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(plaintext, ref decPlen,
+                        null,
+                        ciphertext, (ulong)clen,
                         null, 0,
                         _decNonce, _sodiumDecSubkey);
                     break;
