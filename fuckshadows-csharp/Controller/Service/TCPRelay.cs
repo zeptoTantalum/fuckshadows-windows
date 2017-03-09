@@ -814,7 +814,7 @@ namespace Fuckshadows.Controller
                         }
                         catch (CryptoErrorException)
                         {
-                            Logging.Debug("decryption error");
+                            Logging.Error("decryption error");
                             Close();
                             return;
                         }
@@ -828,7 +828,7 @@ namespace Fuckshadows.Controller
                     }
                     Logging.Debug($"start sending {bytesToSend}");
                     _connection.BeginSend(_remoteSendBuffer, 0, bytesToSend, SocketFlags.None,
-                        PipeConnectionSendCallback, session);
+                        PipeConnectionSendCallback, new object[] { session, bytesToSend });
                     IStrategy strategy = _controller.GetCurrentStrategy();
                     strategy?.UpdateLastRead(_server);
                 }
@@ -894,7 +894,7 @@ namespace Fuckshadows.Controller
             _tcprelay.UpdateOutboundCounter(_server, bytesToSend);
             _startSendingTime = DateTime.Now;
             session.Remote.BeginSend(_connetionSendBuffer, 0, bytesToSend, SocketFlags.None,
-                PipeRemoteSendCallback, session);
+                PipeRemoteSendCallback, new object[] {session, bytesToSend});
             IStrategy strategy = _controller.GetCurrentStrategy();
             strategy?.UpdateLastWrite(_server);
         }
@@ -902,10 +902,19 @@ namespace Fuckshadows.Controller
         private void PipeRemoteSendCallback(IAsyncResult ar)
         {
             if (_closed) return;
-            try
-            {
-                var session = (AsyncSession) ar.AsyncState;
-                session.Remote.EndSend(ar);
+            try {
+                var container = (object[]) ar.AsyncState;
+                var session = (AsyncSession)container[0];
+                var bytesShouldSend = (int)container[1];
+                int bytesSent = session.Remote.EndSend(ar);
+                int bytesRemaining = bytesShouldSend - bytesSent;
+                if (bytesRemaining > 0) {
+                    Logging.Info("reconstruct _connetionSendBuffer to re-send");
+                    Util.Utils.PerfByteCopy(_connetionSendBuffer, bytesSent, _connetionSendBuffer, 0, bytesRemaining);
+                    session.Remote.BeginSend(_connetionSendBuffer, 0, bytesRemaining, SocketFlags.None,
+                        PipeRemoteSendCallback, new object[] { session, bytesRemaining });
+                    return;
+                }
                 _connection.BeginReceive(_connetionRecvBuffer, 0, RecvSize, SocketFlags.None,
                     PipeConnectionReceiveCallback, session);
             }
@@ -916,12 +925,22 @@ namespace Fuckshadows.Controller
             }
         }
 
+        // In general, we assume there is no delay between local proxy and client, add this for sanity
         private void PipeConnectionSendCallback(IAsyncResult ar)
         {
-            try
-            {
-                var session = (AsyncSession) ar.AsyncState;
-                _connection.EndSend(ar);
+            try {
+                var container = (object[]) ar.AsyncState;
+                var session = (AsyncSession) container[0];
+                var bytesShouldSend = (int) container[1];
+                var bytesSent = _connection.EndSend(ar);
+                var bytesRemaining = bytesShouldSend - bytesSent;
+                if (bytesRemaining > 0) {
+                    Logging.Info("reconstruct _remoteSendBuffer to re-send");
+                    Util.Utils.PerfByteCopy(_remoteSendBuffer, bytesSent, _remoteSendBuffer, 0, bytesRemaining);
+                    _connection.BeginSend(_remoteSendBuffer, 0, bytesRemaining, SocketFlags.None,
+                        PipeConnectionSendCallback, new object[] { session, bytesRemaining });
+                    return;
+                }
                 session.Remote.BeginReceive(_remoteRecvBuffer, 0, RecvSize, SocketFlags.None,
                     PipeRemoteReceiveCallback, session);
             }
